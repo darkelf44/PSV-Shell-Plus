@@ -39,7 +39,7 @@ static rgba_t g_gui_color_bg   = {.rgba = {  0,   0,   0, 255}};
 
 static uint32_t g_gui_input_buttons = 0;
 
-static psvs_gui_menu_control_t g_gui_menu_control = PSVS_GUI_MENUCTRL_CPU;
+static int g_gui_menu_control = PSVS_GUI_MENUCTRL_CPU;
 static psvs_gui_mode_t g_gui_mode = PSVS_GUI_MODE_HIDDEN;
 static bool g_gui_mode_changed = false;
 
@@ -48,11 +48,13 @@ static const psvs_gui_page_t g_gui_page_list[PSVS_GUI_PAGE_COUNT] = {{
     .number = 0, // HOME page
     .draw_template = &psvs_gui_draw_home_template,
     .draw_content = &psvs_gui_draw_home_content,
+    .init = &psvs_gui_init_home,
     .input = &psvs_gui_input_home,
 },{
     .number = 1, // 1st page
     .draw_template = &psvs_gui_draw_page_1_template,
     .draw_content = &psvs_gui_draw_page_1_content,
+    .init = &psvs_gui_init_page_1,
     .input = &psvs_gui_input_page_1,
 }};
 const psvs_gui_page_t * g_gui_page = &g_gui_page_list[0];
@@ -104,14 +106,21 @@ void psvs_gui_input_check(uint32_t buttons) {
         if ((buttons_new & SCE_CTRL_LTRIGGER) && (g_gui_page->number > 0)) {
             g_gui_page = &g_gui_page_list[g_gui_page->number - 1]; // Prev page
             g_gui_mode_changed = true;
+            g_gui_page->init();
         } else if ((buttons_new & SCE_CTRL_RTRIGGER) && (g_gui_page->number < PSVS_GUI_PAGE_COUNT - 1)) {
             g_gui_page = &g_gui_page_list[g_gui_page->number + 1]; // Next page
             g_gui_mode_changed = true;
+            g_gui_page->init();
         }
         g_gui_page->input(buttons, buttons_new);
     }
 
     g_gui_input_buttons = buttons;
+}
+
+void psvs_gui_init_home() {
+    // Reset menu location
+    g_gui_menu_control = PSVS_GUI_MENUCTRL_CPU;
 }
 
 void psvs_gui_input_home(uint32_t buttons_held, uint32_t buttons_down) {
@@ -160,7 +169,117 @@ void psvs_gui_input_home(uint32_t buttons_held, uint32_t buttons_down) {
     }
 }
 
+void psvs_gui_init_page_1() {
+    // Reset menu location
+    g_gui_menu_control = PSVS_GUI_EXTRA_SWAP_BUTTONS;
+}
+
 void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
+    // Move U/D
+    if (buttons_down & SCE_CTRL_DOWN && g_gui_menu_control < PSVS_GUI_EXTRA_MAX - 1) {
+        g_gui_menu_control++;
+    } else if (buttons_down & SCE_CTRL_UP && g_gui_menu_control > 0) {
+        g_gui_menu_control--;
+    }
+
+    // X button
+    if (buttons_down & SCE_CTRL_CROSS)
+    {
+        switch (g_gui_menu_control) {
+            case PSVS_GUI_EXTRA_SWAP_BUTTONS:
+                g_profile.swap_buttons = !g_profile.swap_buttons;
+                g_profile_has_changed = true;
+                break;
+
+            case PSVS_GUI_EXTRA_DISABLE_L3R3:
+                g_profile.disable_L3R3 = !g_profile.disable_L3R3;
+                g_profile_has_changed = true;
+                break;
+
+            case PSVS_GUI_EXTRA_BT_TOUCH:
+                g_profile.bt_touch = (g_profile.bt_touch + 1) % PSVS_BT_TOUCH_MAX;
+                g_profile_has_changed = true;
+                break;
+
+            case PSVS_GUI_EXTRA_BT_MOTION:
+                g_profile.bt_motion = (g_profile.bt_motion + 1) % PSVS_BT_MOTION_MAX;
+                g_profile_has_changed = true;
+                break;
+
+            case PSVS_GUI_EXTRA_RESTART:
+                kscePowerRequestColdReset();
+                break;
+
+            case PSVS_GUI_EXTRA_SHUTDOWN:
+                kscePowerRequestStandby();
+                break;
+        }
+    }
+
+    // L/R buttons
+    if (buttons_down & SCE_CTRL_LEFT)
+    {
+        switch (g_gui_menu_control) {
+            case PSVS_GUI_EXTRA_SWAP_BUTTONS:
+                if (g_profile.swap_buttons) {
+                    g_profile.swap_buttons = false;
+                    g_profile_has_changed = true;
+                }
+                break;
+
+            case PSVS_GUI_EXTRA_DISABLE_L3R3:
+                if (g_profile.disable_L3R3) {
+                    g_profile.disable_L3R3 = false;
+                    g_profile_has_changed = true;
+                }
+                break;
+
+            case PSVS_GUI_EXTRA_BT_TOUCH:
+                if (g_profile.bt_touch > 0) {
+                    -- g_profile.bt_touch;
+                    g_profile_has_changed = true;
+                }
+                break;
+
+            case PSVS_GUI_EXTRA_BT_MOTION:
+                if (g_profile.bt_motion > 0) {
+                    -- g_profile.bt_motion;
+                    g_profile_has_changed = true;
+                }
+                break;
+        }
+    }
+    else if (buttons_down & SCE_CTRL_RIGHT) {
+        switch (g_gui_menu_control) {
+            case PSVS_GUI_EXTRA_SWAP_BUTTONS:
+                if (!g_profile.swap_buttons) {
+                    g_profile.swap_buttons = true;
+                    g_profile_has_changed = true;
+                }
+                break;
+
+            case PSVS_GUI_EXTRA_DISABLE_L3R3:
+                if (!g_profile.disable_L3R3) {
+                    g_profile.disable_L3R3 = true;
+                    g_profile_has_changed = true;
+                }
+                break;
+
+            case PSVS_GUI_EXTRA_BT_TOUCH:
+                if (g_profile.bt_touch < PSVS_BT_TOUCH_MAX - 1) {
+                    ++ g_profile.bt_touch;
+                    g_profile_has_changed = true;
+                }
+                break;
+
+            case PSVS_GUI_EXTRA_BT_MOTION:
+                if (g_profile.bt_motion < PSVS_BT_MOTION_MAX - 1) {
+                    ++ g_profile.bt_motion;
+                    g_profile_has_changed = true;
+                }
+                break;
+        }
+    }
 }
 
 void psvs_gui_set_framebuf(const SceDisplayFrameBuf *pParam) {
@@ -544,9 +663,11 @@ void psvs_gui_draw_home_template() {
     psvs_gui_set_text_scale(1.0f);
 
     // Batt
-    psvs_gui_printf(GUI_ANCHOR_RX(10, 9),  GUI_ANCHOR_TY(32, 0), "C");
-    psvs_gui_printf(GUI_ANCHOR_RX(14 + 6 + GUI_BATT_SIZE_W, 1), GUI_ANCHOR_TY(32, 0), "%%");
-    _psvs_gui_draw_battery_template(GUI_ANCHOR_RX(14 + GUI_BATT_SIZE_W, 0), GUI_ANCHOR_TY(35, 0));
+    if (!g_is_dolce) {
+        psvs_gui_printf(GUI_ANCHOR_RX(10, 9),  GUI_ANCHOR_TY(32, 0), "C");
+        psvs_gui_printf(GUI_ANCHOR_RX(14 + 6 + GUI_BATT_SIZE_W, 1), GUI_ANCHOR_TY(32, 0), "%%");
+        _psvs_gui_draw_battery_template(GUI_ANCHOR_RX(14 + GUI_BATT_SIZE_W, 0), GUI_ANCHOR_TY(35, 0));
+    }
 
     // CPU
     psvs_gui_printf(GUI_ANCHOR_LX(10, 0),  GUI_ANCHOR_TY(44, 1), "CPU:");
@@ -748,9 +869,66 @@ void psvs_gui_draw_page_1_template() {
     psvs_gui_set_text_color(255, 255, 255, 255);
     psvs_gui_clear();
 
+    // Header
+    psvs_gui_set_text_scale(0.5f);
+    psvs_gui_printf(GUI_ANCHOR_CX2(18, 0.5f),     GUI_ANCHOR_TY(8, 0), PSVS_VERSION_STRING);
+    psvs_gui_printf(GUI_ANCHOR_RX2(10, 10, 0.5f), GUI_ANCHOR_TY(8, 0), "by Electry");
+    psvs_gui_set_text_scale(1.0f);
+
+    // Controls
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(32, 0), "Swap X/O:");
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(32, 1), "Disable L3/R3:");
+
+    // Bluetooth
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(44, 2), "Bt Touch:");
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(44, 3), "Bt Motion:");
 }
 
+static void _psvs_gui_draw_page_1_item(int offset, int line, int id, int size, const char * value) {
+    if (g_gui_menu_control == id) {
+        psvs_gui_set_text_color(0, 200, 255, 255);
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(offset, line), ">");
+        psvs_gui_printf(GUI_ANCHOR_RX(10, size), GUI_ANCHOR_TY(offset, line), value);
+        psvs_gui_set_text_color(255, 255, 255, 255);
+    } else {
+        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(offset, line), " ");
+        psvs_gui_printf(GUI_ANCHOR_RX(10, size), GUI_ANCHOR_TY(offset, line), value);
+    }
+}
+
+static const char * psvs_gui_button_title[2] = { "off", " on"};
+static const char * psvs_gui_bt_touch_title[PSVS_BT_TOUCH_MAX] = { "  off", "  F/B", "F/B/X"};
+static const char * psvs_gui_bt_motion_title[PSVS_BT_MOTION_MAX] = { "     off", "  normal", "vertical"};
+
 void psvs_gui_draw_page_1_content() {
+    // Header
+    psvs_gui_draw_home_header();
+
+    // Controls
+    _psvs_gui_draw_page_1_item(32, 0, PSVS_GUI_EXTRA_SWAP_BUTTONS, 3, psvs_gui_button_title[g_profile.swap_buttons]);
+    _psvs_gui_draw_page_1_item(32, 1, PSVS_GUI_EXTRA_DISABLE_L3R3, 3, psvs_gui_button_title[g_profile.disable_L3R3]);
+
+    // Bluetooth
+    g_profile.bt_touch = (g_profile.bt_touch < PSVS_BT_TOUCH_MAX) ? g_profile.bt_touch : 0;
+    g_profile.bt_motion = (g_profile.bt_motion < PSVS_BT_MOTION_MAX) ? g_profile.bt_motion : 0;
+    _psvs_gui_draw_page_1_item(44, 2, PSVS_GUI_EXTRA_BT_TOUCH, 5, psvs_gui_bt_touch_title[g_profile.bt_touch]);
+    _psvs_gui_draw_page_1_item(44, 3, PSVS_GUI_EXTRA_BT_MOTION, 8, psvs_gui_bt_motion_title[g_profile.bt_motion]);
+
+    // System
+    if (g_gui_menu_control == PSVS_GUI_EXTRA_RESTART) {
+        psvs_gui_set_text_color(0, 200, 255, 255);
+        psvs_gui_printf(GUI_ANCHOR_CX(16), GUI_ANCHOR_BY(10, 2), "> Restart Vita <");
+        psvs_gui_set_text_color(255, 255, 255, 255);
+    } else {
+        psvs_gui_printf(GUI_ANCHOR_CX(16), GUI_ANCHOR_BY(10, 2), "  Restart Vita  ");
+    }
+    if (g_gui_menu_control == PSVS_GUI_EXTRA_SHUTDOWN) {
+        psvs_gui_set_text_color(0, 200, 255, 255);
+        psvs_gui_printf(GUI_ANCHOR_CX(17), GUI_ANCHOR_BY(10, 1), "> Shutdown Vita <");
+        psvs_gui_set_text_color(255, 255, 255, 255);
+    } else {
+        psvs_gui_printf(GUI_ANCHOR_CX(17), GUI_ANCHOR_BY(10, 1), "  Shutdown Vita  ");
+    }
 }
 
 int psvs_gui_init() {

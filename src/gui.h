@@ -57,19 +57,34 @@ typedef enum {
     PSVS_GUI_MENUCTRL_MAX
 } psvs_gui_menu_control_t;
 
-typedef void (* psvs_gui_page_input_t) (uint32_t buttons_held, uint32_t buttons_down);
+typedef enum {
+    PSVS_GUI_EXTRA_SWAP_BUTTONS,
+    PSVS_GUI_EXTRA_DISABLE_L3R3,
+    PSVS_GUI_EXTRA_BT_TOUCH,
+    PSVS_GUI_EXTRA_BT_MOTION,
+    PSVS_GUI_EXTRA_RESTART,
+    PSVS_GUI_EXTRA_SHUTDOWN,
+    PSVS_GUI_EXTRA_MAX,
+} psvs_gui_extra_control_t;
+
+typedef void (* psvs_gui_page_init_t) ();
 typedef void (* psvs_gui_page_draw_t) ();
+typedef void (* psvs_gui_page_input_t) (uint32_t buttons_held, uint32_t buttons_down);
 
 typedef struct psvs_gui_page_t {
 	int number;
 	psvs_gui_page_draw_t draw_template;
 	psvs_gui_page_draw_t draw_content;
+	psvs_gui_page_init_t init;
 	psvs_gui_page_input_t input;
 } psvs_gui_page_t;
 
 extern const psvs_gui_page_t * g_gui_page;
 
 psvs_gui_mode_t psvs_gui_get_mode();
+
+void psvs_gui_init_home();
+void psvs_gui_init_page_1();
 
 void psvs_gui_input_check(uint32_t buttons);
 void psvs_gui_input_home(uint32_t buttons_held, uint32_t buttons_down);
