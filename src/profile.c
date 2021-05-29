@@ -6,11 +6,36 @@
 
 #include "main.h"
 #include "oc.h"
+#include "bt.h"
+#include "profile.h"
 
 #define PSVS_PROFILES_DIR "ur0:data/PSVshell/profiles/"
 
 static bool g_profile_exists = false;
 static bool g_profile_exists_global = false;
+
+psvs_app_profile_t g_profile = {
+    .ver = PSVS_VERSION_VER,
+    .mode = {0},
+    .manual_freq = {0},
+    .swap_buttons = false,
+    .disable_L3R3 = false,
+    .bt_touch = PSVS_BT_TOUCH_DISABLED,
+    .bt_motion = PSVS_BT_MOTION_DISABLED,
+};
+bool g_profile_has_changed = false;
+
+psvs_app_profile_t * psvs_get_profile() {
+    return &g_profile;
+}
+
+void psvs_set_profile(psvs_app_profile_t * profile) {
+    g_profile = *profile;
+    g_profile_has_changed = false;
+
+    for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++)
+        psvs_oc_set_target_freq(i);
+}
 
 void psvs_profile_init() {
     ksceIoMkdir("ur0:data/", 0777);
@@ -46,17 +71,17 @@ bool psvs_profile_load() {
             ksceIoClose(fd_global);
     }
 
-    psvs_oc_profile_t oc;
-    int bytes = ksceIoRead(fd, &oc, sizeof(psvs_oc_profile_t));
+    psvs_app_profile_t profile;
+    int bytes = ksceIoRead(fd, &profile, sizeof(psvs_app_profile_t));
     ksceIoClose(fd);
 
-    if (bytes != sizeof(psvs_oc_profile_t))
+    if (bytes != sizeof(psvs_app_profile_t))
         return false;
 
-    if (strncmp(oc.ver, PSVS_VERSION_VER, 8))
+    if (strncmp(profile.ver, PSVS_VERSION_VER, 8))
         return false;
 
-    psvs_oc_set_profile(&oc);
+    psvs_set_profile(&profile);
     return true;
 }
 
@@ -74,10 +99,10 @@ bool psvs_profile_save(bool global) {
     if (fd < 0)
         return false;
 
-    int bytes = ksceIoWrite(fd, psvs_oc_get_profile(), sizeof(psvs_oc_profile_t));
+    int bytes = ksceIoWrite(fd, &g_profile, sizeof(psvs_app_profile_t));
     ksceIoClose(fd);
 
-    if (bytes != sizeof(psvs_oc_profile_t))
+    if (bytes != sizeof(psvs_app_profile_t))
         return false;
 
     // mark profile as present
@@ -85,7 +110,7 @@ bool psvs_profile_save(bool global) {
         g_profile_exists_global = true;
     } else {
         g_profile_exists = true;
-        psvs_oc_set_changed(false);
+        g_profile_has_changed = false;
     }
 
     return true;
@@ -100,7 +125,7 @@ bool psvs_profile_delete(bool global) {
             return false;
 
         g_profile_exists = false;
-        psvs_oc_set_changed(true);
+        g_profile_has_changed = true;
     } else {
         if (ksceIoRemove(PSVS_PROFILES_DIR "global") < 0)
             return false;

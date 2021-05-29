@@ -12,6 +12,7 @@
 #include "gui_font_ter-u24b.h"
 #include "perf.h"
 #include "oc.h"
+#include "bt.h"
 #include "profile.h"
 
 int vsnprintf(char *s, size_t n, const char *format, va_list arg);
@@ -41,6 +42,20 @@ static uint32_t g_gui_input_buttons = 0;
 static psvs_gui_menu_control_t g_gui_menu_control = PSVS_GUI_MENUCTRL_CPU;
 static psvs_gui_mode_t g_gui_mode = PSVS_GUI_MODE_HIDDEN;
 static bool g_gui_mode_changed = false;
+
+#define PSVS_GUI_PAGE_COUNT 2
+static const psvs_gui_page_t g_gui_page_list[PSVS_GUI_PAGE_COUNT] = {{
+    .number = 0, // HOME page
+    .draw_template = &psvs_gui_draw_home_template,
+    .draw_content = &psvs_gui_draw_home_content,
+    .input = &psvs_gui_input_home,
+},{
+    .number = 1, // 1st page
+    .draw_template = &psvs_gui_draw_page_1_template,
+    .draw_content = &psvs_gui_draw_page_1_content,
+    .input = &psvs_gui_input_page_1,
+}};
+const psvs_gui_page_t * g_gui_page = &g_gui_page_list[0];
 
 static bool g_gui_lazydraw_batt = false;
 static bool g_gui_lazydraw_memusage = false;
@@ -86,52 +101,66 @@ void psvs_gui_input_check(uint32_t buttons) {
     }
     // In full menu
     else if (g_gui_mode == PSVS_GUI_MODE_FULL) {
-        // Move U/D
-        if (buttons_new & SCE_CTRL_DOWN && g_gui_menu_control < PSVS_GUI_MENUCTRL_MAX - 1) {
-            g_gui_menu_control++;
-        } else if (buttons_new & SCE_CTRL_UP && g_gui_menu_control > 0) {
-            g_gui_menu_control--;
+        if ((buttons_new & SCE_CTRL_LTRIGGER) && (g_gui_page->number > 0)) {
+            g_gui_page = &g_gui_page_list[g_gui_page->number - 1]; // Prev page
+            g_gui_mode_changed = true;
+        } else if ((buttons_new & SCE_CTRL_RTRIGGER) && (g_gui_page->number < PSVS_GUI_PAGE_COUNT - 1)) {
+            g_gui_page = &g_gui_page_list[g_gui_page->number + 1]; // Next page
+            g_gui_mode_changed = true;
         }
-
-        // Profile label
-        if (g_gui_menu_control == PSVS_GUI_MENUCTRL_PROFILE) {
-            if (buttons_new & SCE_CTRL_CROSS) {
-                bool global = buttons & GUI_GLOBAL_PROFILE_BUTTON_MOD;
-                if ((!global && psvs_oc_has_changed()) || !psvs_profile_exists(global)) {
-                    psvs_profile_save(global);
-                } else {
-                    psvs_profile_delete(global);
-                }
-            }
-        }
-        // Freq change
-        else {
-            psvs_oc_device_t device = _psvs_gui_get_selected_device();
-
-            // In manual freq mode
-            if (psvs_oc_get_mode(device) == PSVS_OC_MODE_MANUAL) {
-                // Move L/R
-                if (buttons_new & SCE_CTRL_RIGHT) {
-                    psvs_oc_change_manual(device, true);
-                } else if (buttons_new & SCE_CTRL_LEFT) {
-                    psvs_oc_change_manual(device, false);
-                }
-                // Back to default
-                else if (buttons_new & SCE_CTRL_CROSS) {
-                    psvs_oc_set_mode(device, PSVS_OC_MODE_DEFAULT);
-                }
-            }
-            // In default freq mode
-            else {
-                if (buttons_new & SCE_CTRL_CROSS) {
-                    psvs_oc_reset_manual(device);
-                    psvs_oc_set_mode(device, PSVS_OC_MODE_MANUAL);
-                }
-            }
-        }
+        g_gui_page->input(buttons, buttons_new);
     }
 
     g_gui_input_buttons = buttons;
+}
+
+void psvs_gui_input_home(uint32_t buttons_held, uint32_t buttons_down) {
+    // Move U/D
+    if (buttons_down & SCE_CTRL_DOWN && g_gui_menu_control < PSVS_GUI_MENUCTRL_MAX - 1) {
+        g_gui_menu_control++;
+    } else if (buttons_down & SCE_CTRL_UP && g_gui_menu_control > 0) {
+        g_gui_menu_control--;
+    }
+
+    // Profile label
+    if (g_gui_menu_control == PSVS_GUI_MENUCTRL_PROFILE) {
+        if (buttons_down & SCE_CTRL_CROSS) {
+            bool global = buttons_held & GUI_GLOBAL_PROFILE_BUTTON_MOD;
+            if ((!global && g_profile_has_changed) || !psvs_profile_exists(global)) {
+                psvs_profile_save(global);
+            } else {
+                psvs_profile_delete(global);
+            }
+        }
+    }
+    // Freq change
+    else {
+        psvs_oc_device_t device = _psvs_gui_get_selected_device();
+
+        // In manual freq mode
+        if (psvs_oc_get_mode(device) == PSVS_OC_MODE_MANUAL) {
+            // Move L/R
+            if (buttons_down & SCE_CTRL_RIGHT) {
+                psvs_oc_change_manual(device, true);
+            } else if (buttons_down & SCE_CTRL_LEFT) {
+                psvs_oc_change_manual(device, false);
+            }
+            // Back to default
+            else if (buttons_down & SCE_CTRL_CROSS) {
+                psvs_oc_set_mode(device, PSVS_OC_MODE_DEFAULT);
+            }
+        }
+        // In default freq mode
+        else {
+            if (buttons_down & SCE_CTRL_CROSS) {
+                psvs_oc_reset_manual(device);
+                psvs_oc_set_mode(device, PSVS_OC_MODE_MANUAL);
+            }
+        }
+    }
+}
+
+void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
 }
 
 void psvs_gui_set_framebuf(const SceDisplayFrameBuf *pParam) {
@@ -445,6 +474,12 @@ void psvs_gui_draw_osd_template() {
     _psvs_gui_draw_battery_template(GUI_ANCHOR_RX(14 + GUI_BATT_SIZE_W, 0), GUI_ANCHOR_TY(13, 1));
 }
 
+void psvs_gui_draw_osd_content() {
+    psvs_gui_draw_osd_cpu();
+    psvs_gui_draw_osd_fps();
+    psvs_gui_draw_osd_batt();
+}
+
 void psvs_gui_draw_osd_cpu() {
     int val;
 
@@ -497,7 +532,7 @@ void psvs_gui_draw_osd_fps() {
     psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
-void psvs_gui_draw_template() {
+void psvs_gui_draw_home_template() {
     psvs_gui_set_back_color(0, 0, 0, 255);
     psvs_gui_set_text_color(255, 255, 255, 255);
     psvs_gui_clear();
@@ -531,14 +566,22 @@ void psvs_gui_draw_template() {
     psvs_gui_printf(GUI_ANCHOR_CX(15),     GUI_ANCHOR_BY(10, 2), "XBR [         ]");
 }
 
-void psvs_gui_draw_header() {
+void psvs_gui_draw_home_content() {
+    psvs_gui_draw_home_header();
+    psvs_gui_draw_home_batt_section();
+    psvs_gui_draw_home_cpu_section();
+    psvs_gui_draw_home_memory_section();
+    psvs_gui_draw_home_menu();
+}
+
+void psvs_gui_draw_home_header() {
     // Draw TITLEID
     psvs_gui_set_text_scale(0.5f);
     psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(8, 0), "%-9s", g_titleid);
     psvs_gui_set_text_scale(1.0f);
 }
 
-void psvs_gui_draw_batt_section() {
+void psvs_gui_draw_home_batt_section() {
     // PSTV
     if (g_is_dolce) {
         psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(32, 0), "A/C");
@@ -585,7 +628,7 @@ void psvs_gui_draw_batt_section() {
 
 }
 
-void psvs_gui_draw_cpu_section() {
+void psvs_gui_draw_home_cpu_section() {
     int load;
 
     // Draw AVG load
@@ -634,7 +677,7 @@ static void _psvs_gui_draw_memory_usage(int line, int total, int free, int limit
     }
 }
 
-void psvs_gui_draw_memory_section() {
+void psvs_gui_draw_home_memory_section() {
     psvs_memory_t *mem = psvs_perf_get_memusage();
     if (!mem->_has_changed && !g_gui_lazydraw_memusage)
         return;
@@ -666,7 +709,7 @@ static void _psvs_gui_draw_menu_item(int lines, int clock, psvs_gui_menu_control
     psvs_gui_set_text_color(255, 255, 255, 255);
 }
 
-void psvs_gui_draw_menu() {
+void psvs_gui_draw_home_menu() {
     _psvs_gui_draw_menu_item(5, psvs_oc_get_freq(PSVS_OC_DEVICE_CPU), PSVS_GUI_MENUCTRL_CPU);
     _psvs_gui_draw_menu_item(4, psvs_oc_get_freq(PSVS_OC_DEVICE_GPU_ES4), PSVS_GUI_MENUCTRL_GPU_ES4);
     _psvs_gui_draw_menu_item(3, psvs_oc_get_freq(PSVS_OC_DEVICE_BUS), PSVS_GUI_MENUCTRL_BUS);
@@ -674,7 +717,7 @@ void psvs_gui_draw_menu() {
 
     // Draw profile label separately
     bool show_global = g_gui_input_buttons & GUI_GLOBAL_PROFILE_BUTTON_MOD;
-    bool save = (!show_global && psvs_oc_has_changed()) || !psvs_profile_exists(show_global);
+    bool save = (!show_global && g_profile_has_changed) || !psvs_profile_exists(show_global);
 
     if (save) {
         if (show_global)
@@ -698,6 +741,16 @@ void psvs_gui_draw_menu() {
         psvs_gui_printf(GUI_ANCHOR_CX(save ? 16 : 18) + GUI_ANCHOR_LX(0, save ? 15 : 17),
                         GUI_ANCHOR_BY(10, 1), " ");
     }
+}
+
+void psvs_gui_draw_page_1_template() {
+    psvs_gui_set_back_color(0, 0, 0, 255);
+    psvs_gui_set_text_color(255, 255, 255, 255);
+    psvs_gui_clear();
+
+}
+
+void psvs_gui_draw_page_1_content() {
 }
 
 int psvs_gui_init() {

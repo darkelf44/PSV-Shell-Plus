@@ -6,6 +6,7 @@
 
 #include "main.h"
 #include "oc.h"
+#include "bt.h"
 #include "gui.h"
 #include "perf.h"
 #include "profile.h"
@@ -14,8 +15,8 @@ int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintp
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
 bool ksceAppMgrIsExclusiveProcessRunning();
 bool ksceSblAimgrIsGenuineDolce();
-bool ksceSblACMgrIsPspEmu(SceUID pid);
-bool ksceSblACMgrIsSceShell(SceUID pid);
+//bool ksceSblACMgrIsPspEmu(SceUID pid);
+//bool ksceSblACMgrIsSceShell(SceUID pid);
 
 #define PSVS_MAX_HOOKS 18
 static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
@@ -59,6 +60,14 @@ static void psvs_input_check(SceCtrlData *pad_data, int count) {
         kctrl.buttons = 0;
         for (int i = 0; i < count; i++)
             ksceKernelMemcpyKernelToUser((uintptr_t)&pad_data[i].buttons, &kctrl.buttons, sizeof(uint32_t));
+    }
+}
+
+static void psvs_input_filter(SceCtrlData *pad_data, int count) {
+    // Do not filter blacklisted apps
+    if (g_app != PSVS_APP_BLACKLIST) {
+        for (int i = 0; i < count; ++ i) {
+        }
     }
 }
 
@@ -285,25 +294,17 @@ static int psvs_thread(SceSize args, void *argp) {
             if (mode == PSVS_GUI_MODE_OSD) {
                 psvs_gui_draw_osd_template();
             } else if (mode == PSVS_GUI_MODE_FULL) {
-                psvs_gui_draw_template();
+                g_gui_page->draw_template();
             }
         }
 
         // Draw OSD mode
-        if (mode == PSVS_GUI_MODE_OSD) {
-            psvs_gui_draw_osd_cpu();
-            psvs_gui_draw_osd_fps();
-            psvs_gui_draw_osd_batt();
-        }
+        if (mode == PSVS_GUI_MODE_OSD)
+            psvs_gui_draw_osd_content();
 
         // Draw FULL mode
-        else if (mode == PSVS_GUI_MODE_FULL) {
-            psvs_gui_draw_header();
-            psvs_gui_draw_batt_section();
-            psvs_gui_draw_cpu_section();
-            psvs_gui_draw_memory_section();
-            psvs_gui_draw_menu();
-        }
+        else if (mode == PSVS_GUI_MODE_FULL)
+            g_gui_page->draw_content();
 
         ksceKernelDelayThread(50 * 1000);
     }

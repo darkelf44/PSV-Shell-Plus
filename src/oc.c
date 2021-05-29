@@ -5,6 +5,8 @@
 
 #include "main.h"
 #include "oc.h"
+#include "bt.h"
+#include "profile.h"
 
 // Declare helper getter/setter for GpuEs4
 static int __kscePowerGetGpuEs4ClockFrequency() {
@@ -47,13 +49,6 @@ static psvs_oc_devopt_t g_oc_devopt[PSVS_OC_DEVICE_MAX] = {
     },
 };
 
-static psvs_oc_profile_t g_oc = {
-    .ver = PSVS_VERSION_VER,
-    .mode = {0},
-    .manual_freq = {0}
-};
-static bool g_oc_has_changed = true;
-
 int psvs_oc_get_freq(psvs_oc_device_t device) {
     return g_oc_devopt[device].get_freq();
 }
@@ -72,48 +67,28 @@ void psvs_oc_holy_shit() {
 }
 
 int psvs_oc_get_target_freq(psvs_oc_device_t device, int default_freq) {
-    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
-        return g_oc.manual_freq[device];
+    if (g_profile.mode[device] == PSVS_OC_MODE_MANUAL)
+        return g_profile.manual_freq[device];
     return default_freq;
 }
 
 void psvs_oc_set_target_freq(psvs_oc_device_t device) {
     // Refresh manual clocks
-    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
-        psvs_oc_set_freq(device, g_oc.manual_freq[device]);
+    if (g_profile.mode[device] == PSVS_OC_MODE_MANUAL)
+        psvs_oc_set_freq(device, g_profile.manual_freq[device]);
     // Restore default clocks
-    else if (g_oc.mode[device] == PSVS_OC_MODE_DEFAULT)
+    else if (g_profile.mode[device] == PSVS_OC_MODE_DEFAULT)
         psvs_oc_set_freq(device, psvs_oc_get_default_freq(device));
 }
 
 psvs_oc_mode_t psvs_oc_get_mode(psvs_oc_device_t device) {
-    return g_oc.mode[device];
+    return g_profile.mode[device];
 }
 
 void psvs_oc_set_mode(psvs_oc_device_t device, psvs_oc_mode_t mode) {
-    g_oc.mode[device] = mode;
-    g_oc_has_changed = true;
+    g_profile.mode[device] = mode;
+    g_profile_has_changed = true;
     psvs_oc_set_target_freq(device);
-}
-
-psvs_oc_profile_t *psvs_oc_get_profile() {
-    return &g_oc;
-}
-
-void psvs_oc_set_profile(psvs_oc_profile_t *oc) {
-    memcpy(&g_oc, oc, sizeof(psvs_oc_profile_t));
-    g_oc_has_changed = false;
-
-    for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++)
-        psvs_oc_set_target_freq(i);
-}
-
-bool psvs_oc_has_changed() {
-    return g_oc_has_changed;
-}
-
-void psvs_oc_set_changed(bool changed) {
-    g_oc_has_changed = changed;
 }
 
 int psvs_oc_get_default_freq(psvs_oc_device_t device) {
@@ -148,12 +123,12 @@ int psvs_oc_get_default_freq(psvs_oc_device_t device) {
 }
 
 void psvs_oc_reset_manual(psvs_oc_device_t device) {
-    g_oc.manual_freq[device] = psvs_oc_get_freq(device);
-    g_oc_has_changed = true;
+    g_profile.manual_freq[device] = psvs_oc_get_freq(device);
+    g_profile_has_changed = true;
 }
 
 void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq) {
-    int target_freq = g_oc.manual_freq[device]; // current manual freq
+    int target_freq = g_profile.manual_freq[device]; // current manual freq
 
     for (int i = 0; i < g_oc_devopt[device].freq_n; i++) {
         int ii = raise_freq ? i : g_oc_devopt[device].freq_n - i - 1;
@@ -164,18 +139,18 @@ void psvs_oc_change_manual(psvs_oc_device_t device, bool raise_freq) {
         }
     }
 
-    g_oc.manual_freq[device] = target_freq;
-    g_oc_has_changed = true;
+    g_profile.manual_freq[device] = target_freq;
+    g_profile_has_changed = true;
 
     // Refresh manual clocks
-    if (g_oc.mode[device] == PSVS_OC_MODE_MANUAL)
-        psvs_oc_set_freq(device, g_oc.manual_freq[device]);
+    if (g_profile.mode[device] == PSVS_OC_MODE_MANUAL)
+        psvs_oc_set_freq(device, g_profile.manual_freq[device]);
 }
 
 void psvs_oc_init() {
-    g_oc_has_changed = true;
+    g_profile_has_changed = true;
     for (int i = 0; i < PSVS_OC_DEVICE_MAX; i++) {
-        g_oc.mode[i] = PSVS_OC_MODE_DEFAULT;
+        g_profile.mode[i] = PSVS_OC_MODE_DEFAULT;
         psvs_oc_reset_manual(i);
     }
 }

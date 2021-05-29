@@ -57,9 +57,23 @@ typedef enum {
     PSVS_GUI_MENUCTRL_MAX
 } psvs_gui_menu_control_t;
 
+typedef void (* psvs_gui_page_input_t) (uint32_t buttons_held, uint32_t buttons_down);
+typedef void (* psvs_gui_page_draw_t) ();
+
+typedef struct psvs_gui_page_t {
+	int number;
+	psvs_gui_page_draw_t draw_template;
+	psvs_gui_page_draw_t draw_content;
+	psvs_gui_page_input_t input;
+} psvs_gui_page_t;
+
+extern const psvs_gui_page_t * g_gui_page;
+
 psvs_gui_mode_t psvs_gui_get_mode();
 
 void psvs_gui_input_check(uint32_t buttons);
+void psvs_gui_input_home(uint32_t buttons_held, uint32_t buttons_down);
+void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down);
 
 void psvs_gui_set_framebuf(const SceDisplayFrameBuf *pParam);
 bool psvs_gui_fb_res_changed();
@@ -81,16 +95,23 @@ int psvs_gui_value_from_size(int bytes);
 rgba_t psvs_gui_scale_color(int value, int min, int max);
 
 void psvs_gui_draw_osd_template();
+void psvs_gui_draw_osd_content();
+
 void psvs_gui_draw_osd_cpu();
 void psvs_gui_draw_osd_fps();
 void psvs_gui_draw_osd_batt();
 
-void psvs_gui_draw_template();
-void psvs_gui_draw_header();
-void psvs_gui_draw_batt_section();
-void psvs_gui_draw_cpu_section();
-void psvs_gui_draw_memory_section();
-void psvs_gui_draw_menu();
+void psvs_gui_draw_home_template();
+void psvs_gui_draw_home_content();
+
+void psvs_gui_draw_home_header();
+void psvs_gui_draw_home_batt_section();
+void psvs_gui_draw_home_cpu_section();
+void psvs_gui_draw_home_memory_section();
+void psvs_gui_draw_home_menu();
+
+void psvs_gui_draw_page_1_template();
+void psvs_gui_draw_page_1_content();
 
 int psvs_gui_init();
 void psvs_gui_deinit();
