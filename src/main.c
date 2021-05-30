@@ -1,4 +1,6 @@
 #include <vitasdkkern.h>
+#include <psp2/touch.h>
+#include <psp2/motion.h>
 #include <taihen.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -18,7 +20,7 @@ bool ksceSblAimgrIsGenuineDolce();
 //bool ksceSblACMgrIsPspEmu(SceUID pid);
 //bool ksceSblACMgrIsSceShell(SceUID pid);
 
-#define PSVS_MAX_HOOKS 18
+#define PSVS_MAX_HOOKS 27
 static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
 static SceUID         g_hooks[PSVS_MAX_HOOKS];
 static SceUID         g_injects[1];
@@ -264,6 +266,42 @@ PROCEVENT_EXIT:
     return TAI_CONTINUE(int, g_hookrefs[13], pid, ev, a3, a4, a5, a6);
 }
 
+static int ksceBtReadEvent_patched(SceBtEvent *events, int num_events) {
+    return TAI_CONTINUE(int, g_hookrefs[18], events, num_events);
+}
+
+static int ksceBtHidTransfer_patched(unsigned int mac0, unsigned int mac1, SceBtHidRequest *request) {
+    return TAI_CONTINUE(int, g_hookrefs[19], mac0, mac1, request);
+}
+
+static int ksceTouchPeek_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs) {
+    return TAI_CONTINUE(int, g_hookrefs[20], port, pData, nBufs);
+}
+
+static int ksceTouchRead_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs) {
+    return TAI_CONTINUE(int, g_hookrefs[21], port, pData, nBufs);
+}
+
+static int ksceTouchPeekRegion_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs, int region) {
+    return TAI_CONTINUE(int, g_hookrefs[22], port, pData, nBufs, region);
+}
+
+static int ksceTouchReadRegion_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs, int region) {
+    return TAI_CONTINUE(int, g_hookrefs[23], port, pData, nBufs, region);
+}
+
+static int sceMotionGetState_patched(SceMotionState *motionState) {
+    return TAI_CONTINUE(int, g_hookrefs[24], motionState);
+}
+
+static int sceMotionGetSensorState_patched(SceMotionSensorState *sensorState, int numRecords) {
+    return TAI_CONTINUE(int, g_hookrefs[25], sensorState, numRecords);
+}
+
+static int sceMotionStartSampling_patched(void) {
+    return TAI_CONTINUE(int, g_hookrefs[26]);
+}
+
 static int psvs_thread(SceSize args, void *argp) {
     while (g_thread_run) {
         if (g_app == PSVS_APP_BLACKLIST) {
@@ -354,9 +392,11 @@ int module_start(SceSize argc, const void *args) {
 
     psvs_oc_init(); // reset profile options to default
 
+    // Hook display
     g_hooks[0] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[0],
             "SceDisplay", 0x9FED47AC, 0x16466675, ksceDisplaySetFrameBufInternal_patched);
 
+    // Hook controls
     g_hooks[1] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[1],
             "SceCtrl", 0xD197E3C7, 0x104ED1A7, sceCtrlPeekBufferNegative_patched);
     g_hooks[2] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[2],
@@ -374,6 +414,7 @@ int module_start(SceSize argc, const void *args) {
     g_hooks[8] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[8],
             "SceCtrl", 0xD197E3C7, 0xC4226A3E, sceCtrlReadBufferPositive2_patched);
 
+    // Hook power
     g_hooks[9] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[9],
             "ScePower", 0x1590166F, 0x74DB5AE5, kscePowerSetArmClockFrequency_patched);
     g_hooks[10] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[10],
@@ -394,6 +435,35 @@ int module_start(SceSize argc, const void *args) {
             "ScePower", 0x1082DA7F, 0x1B04A1D6, scePowerGetGpuClockFrequency_patched);
     g_hooks[17] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[17],
             "ScePower", 0x1082DA7F, 0x0A750DEE, scePowerGetGpuXbarClockFrequency_patched);
+
+    // Hook bluetooth
+    g_hooks[18] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[18],
+            "SceBt", TAI_ANY_LIBRARY, 0x5ABB9A9D, ksceBtReadEvent_patched);
+    g_hooks[19] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[19],
+            "SceBt", TAI_ANY_LIBRARY, 0xF9DCEC77, ksceBtHidTransfer_patched);
+
+    // Detect "SceTouch"/"SceTouchDummy" library
+    const char * SceTouchName = "SceTouch";
+    if (taiGetModuleInfoForKernel(KERNEL_PID, "SceTouch", &tai_info) < 0)
+        SceTouchName = "SceTouchDummy";
+
+    // Hook touch input
+    g_hooks[20] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[20],
+            SceTouchName, TAI_ANY_LIBRARY, 0xBAD1960B, ksceTouchPeek_patched);
+    g_hooks[21] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[21],
+            SceTouchName, TAI_ANY_LIBRARY, 0x70C8AACE, ksceTouchRead_patched);
+    g_hooks[22] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[22],
+            SceTouchName, TAI_ANY_LIBRARY, 0x9B3F7207, ksceTouchPeekRegion_patched);
+    g_hooks[23] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[23],
+            SceTouchName, TAI_ANY_LIBRARY, 0x9A91F624, ksceTouchReadRegion_patched);
+
+    // Hook motion input
+    g_hooks[24] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[24],
+            "SceMotion", 0xDC571B3F, 0xBDB32767, sceMotionGetState_patched);
+    g_hooks[25] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[25],
+            "SceMotion", 0xDC571B3F, 0x47D679EA, sceMotionGetSensorState_patched);
+    g_hooks[26] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[26],
+            "SceMotion", 0xDC571B3F, 0x28034AC9, sceMotionStartSampling_patched);
 
     ret = module_get_export_func(KERNEL_PID,
             "SceSysmem", 0x63A519E5, 0x3650963F, (uintptr_t *)&SceSysmemForKernel_0x3650963F); // 3.60
