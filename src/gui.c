@@ -1,4 +1,6 @@
 #include <vitasdkkern.h>
+#include <psp2/touch.h>
+#include <psp2/motion.h>
 #include <taihen.h>
 #include <string.h>
 #include <stdarg.h>
@@ -388,6 +390,27 @@ void psvs_gui_dd_fps() {
 
     for (int i = 0; i < len; i++) {
         _psvs_gui_dd_prchar(buf[i], 10 + i * g_gui_font_width * g_gui_font_scale, 10);
+    }
+
+    DACR_RESET(dacr);
+}
+
+void psvs_gui_dd_dot(int cx, int cy, int r, rgba_t color) {
+    uint32_t dacr;
+    DACR_UNRESTRICT(dacr);
+
+    int rr = (r + 1) * (r + 1);
+    for (int dy = -r; dy <= r; ++ dy) {
+        int y = cy + dy;
+        if (y >= 0 && y < g_gui_fb.height) {
+            size_t offset = y * g_gui_fb.pitch;
+            for (int dx = -r; dx <= r; ++ dx) {
+                int x = cx + dx;
+                if (x >= 0 && x < g_gui_fb.width && (dx * dx + dy * dy < rr)) {
+                    *((rgba_t *) g_gui_fb.base + offset + x) = color;
+                }
+            }
+        }
     }
 
     DACR_RESET(dacr);
@@ -943,7 +966,7 @@ int psvs_gui_init() {
     return 0;
 }
 
-void psvs_gui_deinit() {
+void psvs_gui_done() {
     if (g_gui_buffer_uid >= 0)
         ksceKernelFreeMemBlock(g_gui_buffer_uid);
 }

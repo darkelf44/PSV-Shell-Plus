@@ -266,28 +266,48 @@ PROCEVENT_EXIT:
     return TAI_CONTINUE(int, g_hookrefs[13], pid, ev, a3, a4, a5, a6);
 }
 
-static int ksceBtReadEvent_patched(SceBtEvent *events, int num_events) {
-    return TAI_CONTINUE(int, g_hookrefs[18], events, num_events);
+static int ksceBtHidTransfer_patched(unsigned int mac0, unsigned int mac1, SceBtHidRequest *request) {
+    int result = TAI_CONTINUE(int, g_hookrefs[18], mac0, mac1, request);
+    if ((g_profile.bt_touch || g_profile.bt_motion) && result >= 0 && psvs_bt_connected(mac0, mac1)) {
+        psvs_bt_on_hid_transfer(request);
+    }
+    return result;
 }
 
-static int ksceBtHidTransfer_patched(unsigned int mac0, unsigned int mac1, SceBtHidRequest *request) {
-    return TAI_CONTINUE(int, g_hookrefs[19], mac0, mac1, request);
+static int ksceTouchGetPanelInfo_patched(SceUInt32 port, SceTouchPanelInfo *pPanelInfo) {
+    return TAI_CONTINUE(int, g_hookrefs[19], port, pPanelInfo);
 }
 
 static int ksceTouchPeek_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs) {
-    return TAI_CONTINUE(int, g_hookrefs[20], port, pData, nBufs);
+    int result = TAI_CONTINUE(int, g_hookrefs[20], port, pData, nBufs);
+    if (g_profile.bt_touch) {
+        result = psvs_bt_touch_filter_input(true, port, pData, result);
+    }
+    return result;
 }
 
 static int ksceTouchRead_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs) {
-    return TAI_CONTINUE(int, g_hookrefs[21], port, pData, nBufs);
+    int result = TAI_CONTINUE(int, g_hookrefs[21], port, pData, nBufs);
+    if (g_profile.bt_touch) {
+        result = psvs_bt_touch_filter_input(false, port, pData, result);
+    }
+    return result;
 }
 
 static int ksceTouchPeekRegion_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs, int region) {
-    return TAI_CONTINUE(int, g_hookrefs[22], port, pData, nBufs, region);
+    int result = TAI_CONTINUE(int, g_hookrefs[22], port, pData, nBufs, region);
+    if (g_profile.bt_touch) {
+        result = psvs_bt_touch_filter_input(true, port, pData, result);
+    }
+    return result;
 }
 
 static int ksceTouchReadRegion_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs, int region) {
-    return TAI_CONTINUE(int, g_hookrefs[23], port, pData, nBufs, region);
+    int result = TAI_CONTINUE(int, g_hookrefs[23], port, pData, nBufs, region);
+    if (g_profile.bt_touch) {
+        result = psvs_bt_touch_filter_input(false, port, pData, result);
+    }
+    return result;
 }
 
 static int sceMotionGetState_patched(SceMotionState *motionState) {
@@ -391,6 +411,7 @@ int module_start(SceSize argc, const void *args) {
     g_mutex_framebuf_uid = ksceKernelCreateMutex("psvs_mutex_framebuf", 0, 0, NULL);
 
     psvs_oc_init(); // reset profile options to default
+    psvs_bt_init(); // create mutexes for bt module
 
     // Hook display
     g_hooks[0] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[0],
@@ -438,8 +459,6 @@ int module_start(SceSize argc, const void *args) {
 
     // Hook bluetooth
     g_hooks[18] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[18],
-            "SceBt", TAI_ANY_LIBRARY, 0x5ABB9A9D, ksceBtReadEvent_patched);
-    g_hooks[19] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[19],
             "SceBt", TAI_ANY_LIBRARY, 0xF9DCEC77, ksceBtHidTransfer_patched);
 
     // Detect "SceTouch"/"SceTouchDummy" library
@@ -448,6 +467,8 @@ int module_start(SceSize argc, const void *args) {
         SceTouchName = "SceTouchDummy";
 
     // Hook touch input
+    g_hooks[19] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[19],
+            SceTouchName, TAI_ANY_LIBRARY, 0x937DB4C0, ksceTouchGetPanelInfo_patched);
     g_hooks[20] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[20],
             SceTouchName, TAI_ANY_LIBRARY, 0xBAD1960B, ksceTouchPeek_patched);
     g_hooks[21] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[21],
@@ -512,7 +533,8 @@ int module_stop(SceSize argc, const void *args) {
     if (g_mutex_framebuf_uid >= 0)
         ksceKernelDeleteMutex(g_mutex_framebuf_uid);
 
-    psvs_gui_deinit();
+    psvs_bt_done();
+    psvs_gui_done();
 
     return SCE_KERNEL_STOP_SUCCESS;
 }

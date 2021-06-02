@@ -1,4 +1,6 @@
 #include <vitasdkkern.h>
+#include <psp2/touch.h>
+#include <psp2/motion.h>
 #include <taihen.h>
 #include <stdbool.h>
 #include <stdio.h>

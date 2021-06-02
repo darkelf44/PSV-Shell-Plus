@@ -44,6 +44,7 @@ target_link_libraries(${PROJECT_NAME}
   SceSblAIMgrForDriver_stub
   SceDisplayForDriver_stub
   SceSblACMgrForDriver_stub
+  SceBtForDriver_stub
 )
 
 vita_create_self(psvshell+.skprx ${PROJECT_NAME}

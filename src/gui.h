@@ -100,6 +100,7 @@ void psvs_gui_set_text_color2(rgba_t color);
 void psvs_gui_set_text_scale(float scale);
 
 void psvs_gui_dd_fps();
+void psvs_gui_dd_dot(int cx, int cy, int r, rgba_t color);
 
 void psvs_gui_clear();
 void psvs_gui_print(int x, int y, const char *str);
@@ -129,7 +130,7 @@ void psvs_gui_draw_page_1_template();
 void psvs_gui_draw_page_1_content();
 
 int psvs_gui_init();
-void psvs_gui_deinit();
+void psvs_gui_done();
 void psvs_gui_cpy();
 
 #endif
