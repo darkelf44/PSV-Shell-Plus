@@ -58,10 +58,7 @@ struct psvs_ds3_input_report_t {
     unsigned short accel_y;
     unsigned short accel_z;
 
-    union {
-        unsigned short gyro_z;
-        unsigned short roll;
-    };
+    unsigned short gyro_z;
 } __attribute__((packed, aligned(32)));
 
 struct psvs_ds4_input_report_t {
@@ -90,18 +87,10 @@ struct psvs_ds4_input_report_t {
     signed short accel_y;
     signed short accel_z;
 
-    union {
-        signed short roll;
-        signed short gyro_z;
-    };
-    union {
-        signed short yaw;
-        signed short gyro_y;
-    };
-    union {
-        signed short pitch;
-        signed short gyro_x;
-    };
+    // These encode the direction of the "up" vector compared to the controller (-X is forward, -Z is left, +Y is up retlative to the controller)
+    signed short gyro_z;
+    signed short gyro_y;
+    signed short gyro_x;
 
     unsigned char unk1[5];
 
@@ -138,21 +127,46 @@ typedef enum psvs_gamepad_type_t {
     PSVS_GAMEPAD_DS4,
 } psvs_gamepad_type_t;
 
-typedef struct psvs_touch_panel_t {
-    volatile uint64_t count;
-    volatile int last; // last used buffer
-    SceTouchData buffers[2]; // double buffered the input (cheaper then a mutex)
-} psvs_touch_panel_t;
+#define PSVS_TOUCH_MAX_FRAMES 4
+
+typedef struct psvs_touch_point_t {
+    uint8_t id;
+    uint8_t r0;
+    uint16_t x;
+    uint16_t y;
+} psvs_touch_point_t;
+
+typedef struct psvs_touch_frame_t {
+    uint64_t timestamp;
+    int8_t port;
+    int8_t count;
+    psvs_touch_point_t points[2];
+} psvs_touch_frame_t;
 
 typedef struct psvs_touch_info_t {
     bool pad_down;
     int8_t pad_port;
-    int8_t active_port;
-    psvs_touch_panel_t active_panel; // Data for active panel
-    psvs_touch_panel_t inactive_panel; // Data for inactive panels
+    volatile int last; // Last frame index
+    psvs_touch_frame_t frames[PSVS_TOUCH_MAX_FRAMES];
 } psvs_touch_info_t;
 
+#define PSVS_MOTION_MAX_FRAMES 16
+
+typedef struct psvs_vec3_t {
+	int16_t x;
+	int16_t y;
+	int16_t z;
+} psvs_vec3_t;
+
+typedef struct psvs_motion_frame_t {
+	uint64_t timestamp;
+	psvs_vec3_t gyro;
+	psvs_vec3_t accel;
+} psvs_motion_frame_t;
+
 typedef struct psvs_motion_info_t {
+	volatile int last; // Last frame index
+	psvs_motion_frame_t frames[PSVS_MOTION_MAX_FRAMES];
 } psvs_motion_info_t;
 
 typedef struct psvs_gamepad_t {
@@ -167,6 +181,16 @@ typedef struct psvs_gamepad_t {
 static psvs_gamepad_t g_gamepad = {
     .type = PSVS_GAMEPAD_NONE,
 };
+
+typedef struct psvs_motion_process_info_t {
+    psvs_motion_flags_t flags;
+    float angle_treshold;
+} psvs_motion_process_info_t;
+
+typedef struct psvs_bt_process_info_t {
+    bool init;
+    psvs_motion_process_info_t motion;
+} psvs_bt_process_info_t;
 
 static int g_bt_process_info_uid = -1;;
 
@@ -192,9 +216,29 @@ static int g_bt_process_info_uid = -1;;
 #define PSVS_VITA_TOUCH_BACK_H (445*2 - 54*2)
 
 void psvs_bt_init() {
+	// Init Process local storage
+	g_bt_process_info_uid = ksceKernelCreateProcessLocalStorage("psvs_bt_process_info", sizeof(psvs_bt_process_info_t));
 }
 
 void psvs_bt_done() {
+}
+
+static psvs_bt_process_info_t * _psvs_bt_process_info(void) {
+	// Get process info
+	psvs_bt_process_info_t * info = ksceKernelGetProcessLocalStorageAddr(g_bt_process_info_uid);
+	// Initialize process info
+	if (!info->init) {
+		psvs_bt_process_info_t init = {
+			.init = true,
+			.motion = {
+				.flags = PSVS_MOTION_FLAG_ENABLE_DEAD_BAND | PSVS_MOTION_FLAG_ENABLE_TILT_CORRECTION,
+				.angle_treshold = 0,
+			},
+		};
+		*info = init;
+	}
+	// Return process info
+	return info;
 }
 
 static psvs_gamepad_type_t _psvs_bt_get_gamepad_type(unsigned short vid, unsigned short pid) {
@@ -223,7 +267,6 @@ bool psvs_bt_connected(unsigned int mac0, unsigned int mac1) {
             g_gamepad.mac1 = mac1;
             g_gamepad.timestamp = ksceKernelGetSystemTimeWide();
             g_gamepad.touch.pad_port = 0;
-            g_gamepad.touch.active_port = 0;
         }
         return !! g_gamepad.type;
     }
@@ -266,7 +309,8 @@ void psvs_bt_on_hid_transfer(SceBtHidRequest * head) {
     if (g_profile.bt_touch && g_gamepad.type == PSVS_GAMEPAD_DS4) {
         for (SceBtHidRequest * request = head; request; request = request->next) {
             if ((request->type == 0) && request->buffer && request->length >= sizeof(psvs_ds4_input_report_t)) {
-                // Interpret data
+
+                // Process DS4 input
                 psvs_ds4_input_report_t * report = (psvs_ds4_input_report_t*) request->buffer;
 
                 // Read touchpad press
@@ -287,72 +331,71 @@ void psvs_bt_on_hid_transfer(SceBtHidRequest * head) {
                     // Active port
                     int port = g_gamepad.touch.pad_port;
 
-                    // Base data
-                    SceTouchData data = {
-                        .timeStamp = g_gamepad.timestamp,
-                        .status = 0,
-                        .reportNum = 0,
+                    // Frame data
+                    psvs_touch_frame_t frame = {
+                        .timestamp = g_gamepad.timestamp,
+                        .port = port,
+                        .count = 0,
                     };
 
-                    // Handle inactive panels
-                    int next = (g_gamepad.touch.inactive_panel.last + 1) & 1;
-                    g_gamepad.touch.inactive_panel.buffers[next] = data;
-                    g_gamepad.touch.inactive_panel.count += 1;
-                    __atomic_store_n(&g_gamepad.touch.inactive_panel.last, next, __ATOMIC_SEQ_CST);
-
-                    // Handle active panel
-                    if (port >= 0 && port < SCE_TOUCH_PORT_MAX_NUM) {
-                        // Add 1st finger
-                        if (!report->finger1_activelow) {
-                            SceTouchReport finger = {
-                                .id = report->finger1_id,
-                                .force = 128,
-                                .x = _psvs_rescale_touch_x(port, report->finger1_x),
-                                .y = _psvs_rescale_touch_y(port, report->finger1_y),
-                            };
-                            data.report[data.reportNum ++] = finger;
-                        }
-                        // Add 2nd finger
-                        if (!report->finger2_activelow) {
-                            SceTouchReport finger = {
-                                .id = report->finger2_id,
-                                .force = 128,
-                                .x = _psvs_rescale_touch_x(port, report->finger2_x),
-                                .y = _psvs_rescale_touch_y(port, report->finger2_y),
-                            };
-                            data.report[data.reportNum ++] = finger;
-                        }
-                        // Update active port
-                        g_gamepad.touch.active_port = port;
-                        // Update panel data
-                        next = (g_gamepad.touch.active_panel.last + 1) & 1;
-                        g_gamepad.touch.active_panel.buffers[next] = data;
-                        g_gamepad.touch.active_panel.count += 1;
-                        __atomic_store_n(&g_gamepad.touch.active_panel.last, next, __ATOMIC_SEQ_CST);
+                    // Add 1st finger
+                    if (!report->finger1_activelow) {
+                        psvs_touch_point_t point = {.id = report->finger1_id, .x = report->finger1_x, .y = report->finger1_y};
+                        frame.points[frame.count ++] = point;
                     }
+                    // Add 2nd finger
+                    if (!report->finger2_activelow) {
+                        psvs_touch_point_t point = {.id = report->finger2_id, .x = report->finger2_x, .y = report->finger2_y};
+                        frame.points[frame.count ++] = point;
+                    }
+
+                    // Append frame data
+                    int next = (g_gamepad.touch.last + 1) % PSVS_TOUCH_MAX_FRAMES;
+                    g_gamepad.touch.frames[next] = frame;
+                    __atomic_store_n(&g_gamepad.touch.last, next, __ATOMIC_SEQ_CST);
                 }
             }
         }
     }
 
     // Handle motion events
-    /*
     if (g_profile.bt_motion) {
         for (SceBtHidRequest * request = head; request; request = request->next) {
-            if (g_gamepad.type == PSVS_GAMEPAD_DS4) {
-                if ((request->type == 0) && request->buffer && request->length >= sizeof(psvs_ds4_input_report_t)) {
-                    // DS4 input received
-                    psvs_ds4_input_report_t * report = (psvs_ds4_input_report_t*) request->buffer;
-                }
-            } else if (g_gamepad.type == PSVS_GAMEPAD_DS3) {
+            if (g_gamepad.type == PSVS_GAMEPAD_DS3) {
                 if ((request->type == 0) && request->buffer && request->length >= sizeof(psvs_ds3_input_report_t)) {
-                    // DS3 input received
+                    // Process DS3 input
                     psvs_ds3_input_report_t * report = (psvs_ds3_input_report_t*) request->buffer;
+                }
+            } else if (g_gamepad.type == PSVS_GAMEPAD_DS4) {
+                if ((request->type == 0) && request->buffer && request->length >= sizeof(psvs_ds4_input_report_t)) {
+                    // Process DS4 input
+                    psvs_ds4_input_report_t * report = (psvs_ds4_input_report_t*) request->buffer;
+
+                    // Last input
+                    if (!request->next) {
+
+                        // Frame data
+                        psvs_motion_frame_t frame = {
+                            .timestamp = g_gamepad.timestamp,
+                        };
+
+                        // Add raw motion data
+                        frame.gyro.x = report->gyro_x;
+                        frame.gyro.y = report->gyro_y;
+                        frame.gyro.z = report->gyro_z;
+                        frame.accel.x = report->accel_x;
+                        frame.accel.y = report->accel_y;
+                        frame.accel.z = report->accel_z;
+
+                        // Append frame data
+                        int next = (g_gamepad.motion.last + 1) % PSVS_MOTION_MAX_FRAMES;
+                        g_gamepad.motion.frames[next] = frame;
+                        __atomic_store_n(&g_gamepad.motion.last, next, __ATOMIC_SEQ_CST);
+                    }
                 }
             }
         }
     }
-    */
 }
 
 int psvs_bt_touch_filter_input(bool peek, uint32_t port, SceTouchData *pData, uint32_t nBufs) {
@@ -367,29 +410,86 @@ int psvs_bt_touch_filter_input(bool peek, uint32_t port, SceTouchData *pData, ui
         return nBufs;
     }
 
-    // Get active port
-    int active_port = g_gamepad.touch.active_port;
-
     // On very old data
     if (ksceKernelGetSystemTimeWide() - g_gamepad.timestamp > PSVS_BT_PACKET_TIMEOUT) {
-        active_port = -1; // Make both panels inactive
+        port = SCE_TOUCH_PORT_MAX_NUM + 1; // Make both panels inactive
     }
 
-    // Override touch data with the latest one
-    for (int i = 0; i < nBufs; ++ i) {
-        if (port == active_port) {
-            int last = __atomic_load_n(&g_gamepad.touch.active_panel.last, __ATOMIC_SEQ_CST) & 1; // Atomic ensures that we never read the buffer that is currently written
-            pData[i] = g_gamepad.touch.active_panel.buffers[last];
-        } else {
-            int last = __atomic_load_n(&g_gamepad.touch.inactive_panel.last, __ATOMIC_SEQ_CST) & 1; // Atomic ensures that we never read the buffer that is currently written
-            pData[i] = g_gamepad.touch.inactive_panel.buffers[last];
+    // Get latest frame
+    int last = __atomic_load_n(&g_gamepad.touch.last, __ATOMIC_SEQ_CST) % PSVS_TOUCH_MAX_FRAMES; // Atomic ensures that we never read the buffer that is currently written
+    psvs_touch_frame_t * frame = &g_gamepad.touch.frames[last];
+
+    // Base data
+    SceTouchData data = {
+        .timeStamp = frame->timestamp,
+        .status = 0,
+        .reportNum = 0,
+    };
+
+    // On active panel
+    if (port == frame->port) {
+        data.reportNum = frame->count;
+        for (int j = 0; j < frame->count; ++ j) {
+            SceTouchReport point = {
+                .id = frame->points[j].id,
+                .force = 128,
+                .x = _psvs_rescale_touch_x(port, frame->points[j].x),
+                .y = _psvs_rescale_touch_y(port, frame->points[j].y),
+            };
+            data.report[j] = point;
         }
+    }
+
+    // TODO: use more then one frame
+    for (int i = 0; i < nBufs; ++ i) {
+        // Override data
+        pData[i] = data;
     }
 
     // Return touch data
     return nBufs;
 }
 
-// ksceKernelCreateProcessLocalStorage() + ksceKernelGetProcessLocalStorageAddr()
-// Store motion and touch settings per process
+int psvs_bt_motion_filter_state(SceMotionState * motionState) {
+	// Result data in Kernel
+	SceMotionState result = {
+	};
 
+	// Copy result to User buffer
+	//ksceKernelMemcpyKernelToUser((uintptr_t) motionState, &result, sizeof(result));
+
+	// return SCE_OK
+	return 0;
+}
+
+int psvs_bt_motion_filter_sensorstate(SceMotionSensorState *sensorState, int numRecords) {
+
+	// Result data in Kernel
+	SceMotionSensorState result = {
+	};
+
+	// Get last buffer index
+
+	for (int i = 0; i < numRecords; ++ i) {
+
+
+		// Copy result to User buffer
+		//ksceKernelMemcpyKernelToUser((uintptr_t) (sensorState + i), &result, sizeof(result));
+	}
+
+	// return SCE_OK
+	return 0;
+}
+
+bool psvs_bt_motion_get_flag(psvs_motion_flags_t flag) {
+    // Return flag data
+    return _psvs_bt_process_info()->motion.flags & flag;
+}
+
+void psvs_bt_motion_set_flag(psvs_motion_flags_t flag, bool value) {
+    // Set flag data
+    if (value)
+        _psvs_bt_process_info()->motion.flags |= flag;
+    else
+        _psvs_bt_process_info()->motion.flags &= ~flag;
+}

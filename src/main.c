@@ -20,7 +20,7 @@ bool ksceSblAimgrIsGenuineDolce();
 //bool ksceSblACMgrIsPspEmu(SceUID pid);
 //bool ksceSblACMgrIsSceShell(SceUID pid);
 
-#define PSVS_MAX_HOOKS 27
+#define PSVS_MAX_HOOKS 35
 static tai_hook_ref_t g_hookrefs[PSVS_MAX_HOOKS];
 static SceUID         g_hooks[PSVS_MAX_HOOKS];
 static SceUID         g_injects[1];
@@ -268,9 +268,8 @@ PROCEVENT_EXIT:
 
 static int ksceBtHidTransfer_patched(unsigned int mac0, unsigned int mac1, SceBtHidRequest *request) {
     int result = TAI_CONTINUE(int, g_hookrefs[18], mac0, mac1, request);
-    if ((g_profile.bt_touch || g_profile.bt_motion) && result >= 0 && psvs_bt_connected(mac0, mac1)) {
+    if ((g_profile.bt_touch || g_profile.bt_motion) && result >= 0 && psvs_bt_connected(mac0, mac1))
         psvs_bt_on_hid_transfer(request);
-    }
     return result;
 }
 
@@ -280,46 +279,91 @@ static int ksceTouchGetPanelInfo_patched(SceUInt32 port, SceTouchPanelInfo *pPan
 
 static int ksceTouchPeek_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs) {
     int result = TAI_CONTINUE(int, g_hookrefs[20], port, pData, nBufs);
-    if (g_profile.bt_touch) {
+    if (g_profile.bt_touch)
         result = psvs_bt_touch_filter_input(true, port, pData, result);
-    }
     return result;
 }
 
 static int ksceTouchRead_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs) {
     int result = TAI_CONTINUE(int, g_hookrefs[21], port, pData, nBufs);
-    if (g_profile.bt_touch) {
+    if (g_profile.bt_touch)
         result = psvs_bt_touch_filter_input(false, port, pData, result);
-    }
     return result;
 }
 
 static int ksceTouchPeekRegion_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs, int region) {
     int result = TAI_CONTINUE(int, g_hookrefs[22], port, pData, nBufs, region);
-    if (g_profile.bt_touch) {
+    if (g_profile.bt_touch)
         result = psvs_bt_touch_filter_input(true, port, pData, result);
-    }
     return result;
 }
 
 static int ksceTouchReadRegion_patched(SceUInt32 port, SceTouchData *pData, SceUInt32 nBufs, int region) {
     int result = TAI_CONTINUE(int, g_hookrefs[23], port, pData, nBufs, region);
-    if (g_profile.bt_touch) {
+    if (g_profile.bt_touch)
         result = psvs_bt_touch_filter_input(false, port, pData, result);
-    }
     return result;
 }
 
 static int sceMotionGetState_patched(SceMotionState *motionState) {
-    return TAI_CONTINUE(int, g_hookrefs[24], motionState);
+    int result = TAI_CONTINUE(int, g_hookrefs[24], motionState);
+    if (g_profile.bt_motion)
+        result = psvs_bt_motion_filter_state(motionState);
+    return result;
 }
 
 static int sceMotionGetSensorState_patched(SceMotionSensorState *sensorState, int numRecords) {
-    return TAI_CONTINUE(int, g_hookrefs[25], sensorState, numRecords);
+    int result = TAI_CONTINUE(int, g_hookrefs[25], sensorState, numRecords);
+    if (g_profile.bt_motion)
+        result = psvs_bt_motion_filter_sensorstate(sensorState, numRecords);
+    return result;
+}
+
+static int sceMotionGetBasicOrientation_patched(SceFVector3 *basicOrientation) {
+    int result = TAI_CONTINUE(int, g_hookrefs[26], basicOrientation);
+    return result;
+}
+
+static float sceMotionGetAngleThreshold_patched(void) {
+    return TAI_CONTINUE(float, g_hookrefs[27]);
+}
+
+static int sceMotionSetAngleThreshold_patched(float angle) {
+    return TAI_CONTINUE(int, g_hookrefs[28], angle);
+}
+
+static int sceMotionGetDeadband_patched(void) {
+    return TAI_CONTINUE(int, g_hookrefs[29]);
+}
+
+static int sceMotionSetDeadband_patched(int value) {
+    int result = TAI_CONTINUE(int, g_hookrefs[30], value);
+    if (result)
+        psvs_bt_motion_set_flag(PSVS_MOTION_FLAG_ENABLE_DEAD_BAND, value);
+    return result;
+}
+
+static int sceMotionGetTiltCorrection_patched(void) {
+    return TAI_CONTINUE(int, g_hookrefs[31]);
+}
+
+static int sceMotionSetTiltCorrection_patched(int value) {
+    int result = TAI_CONTINUE(int, g_hookrefs[32], value);
+    if (result)
+        psvs_bt_motion_set_flag(PSVS_MOTION_FLAG_ENABLE_TILT_CORRECTION, value);
+    return result;
 }
 
 static int sceMotionStartSampling_patched(void) {
-    return TAI_CONTINUE(int, g_hookrefs[26]);
+    int result = TAI_CONTINUE(int, g_hookrefs[33]);
+    psvs_bt_motion_set_flag(PSVS_MOTION_FLAG_ENABLE_MOTION, true);
+    return result;
+}
+
+static int sceMotionStopSampling_patched(void) {
+    int result = TAI_CONTINUE(int, g_hookrefs[34]);
+    psvs_bt_motion_set_flag(PSVS_MOTION_FLAG_ENABLE_MOTION, false);
+    return result;
 }
 
 static int psvs_thread(SceSize args, void *argp) {
@@ -484,7 +528,23 @@ int module_start(SceSize argc, const void *args) {
     g_hooks[25] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[25],
             "SceMotion", 0xDC571B3F, 0x47D679EA, sceMotionGetSensorState_patched);
     g_hooks[26] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[26],
+            "SceMotion", 0xDC571B3F, 0x4F28BFE0, sceMotionGetBasicOrientation_patched);
+    g_hooks[27] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[27],
+            "SceMotion", 0xDC571B3F, 0x499B6C87, sceMotionGetAngleThreshold_patched);
+    g_hooks[28] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[28],
+            "SceMotion", 0xDC571B3F, 0xDACB2A41, sceMotionSetAngleThreshold_patched);
+    g_hooks[29] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[29],
+            "SceMotion", 0xDC571B3F, 0x112E0EAE, sceMotionGetDeadband_patched);
+    g_hooks[30] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[30],
+            "SceMotion", 0xDC571B3F, 0x917EA390, sceMotionSetDeadband_patched);
+    g_hooks[31] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[31],
+            "SceMotion", 0xDC571B3F, 0xC1652201, sceMotionGetTiltCorrection_patched);
+    g_hooks[32] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[32],
+            "SceMotion", 0xDC571B3F, 0xAF09FCDB, sceMotionSetTiltCorrection_patched);
+    g_hooks[33] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[33],
             "SceMotion", 0xDC571B3F, 0x28034AC9, sceMotionStartSampling_patched);
+    g_hooks[34] = taiHookFunctionExportForKernel(KERNEL_PID, &g_hookrefs[34],
+            "SceMotion", 0xDC571B3F, 0xAF32CB1D, sceMotionStopSampling_patched);
 
     ret = module_get_export_func(KERNEL_PID,
             "SceSysmem", 0x63A519E5, 0x3650963F, (uintptr_t *)&SceSysmemForKernel_0x3650963F); // 3.60
