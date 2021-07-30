@@ -55,20 +55,35 @@ int (*_kscePowerSetBusClockFrequency)(int freq);
 int (*_kscePowerSetGpuEs4ClockFrequency)(int a1, int a2);
 int (*_kscePowerSetGpuXbarClockFrequency)(int freq);
 
-static void psvs_input_check(SceCtrlData *pad_data, int count) {
-    // Do not pass input to fg app
-    if (g_app != PSVS_APP_BLACKLIST && psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
-        SceCtrlData kctrl;
-        kctrl.buttons = 0;
-        for (int i = 0; i < count; i++)
-            ksceKernelMemcpyKernelToUser((uintptr_t)&pad_data[i].buttons, &kctrl.buttons, sizeof(uint32_t));
-    }
-}
-
 static void psvs_input_filter(SceCtrlData *pad_data, int count) {
     // Do not filter blacklisted apps
     if (g_app != PSVS_APP_BLACKLIST) {
-        for (int i = 0; i < count; ++ i) {
+        int32_t buttons = 0;
+        if (psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
+            // GUI is open, do not pass any input to the app
+            for (int i = 0; i < count; ++ i)
+                ksceKernelMemcpyKernelToUser((uintptr_t)&pad_data[i].buttons, &buttons, sizeof(uint32_t));
+        } else if (g_profile.swap_buttons || g_profile.disable_L3R3) {
+            // GUI is close, filter input according to profile
+            for (int i = 0; i < count; ++ i) {
+                // Read pressed buttons
+                ksceKernelMemcpyUserToKernel(&buttons, (uintptr_t)&pad_data[i].buttons, sizeof(uint32_t));
+
+                // Swap Cross and Circle buttons
+                if (g_profile.swap_buttons) {
+                    uint32_t state = buttons & (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE);
+                    if (state == SCE_CTRL_CROSS || state == SCE_CTRL_CIRCLE)
+                        buttons ^= (SCE_CTRL_CROSS | SCE_CTRL_CIRCLE);
+                }
+
+                // Disable L3 and R3
+                if (g_profile.disable_L3R3) {
+                    buttons &= ~ (SCE_CTRL_L3 | SCE_CTRL_R3);
+                }
+
+                // Write pressed buttons
+                ksceKernelMemcpyKernelToUser((uintptr_t)&pad_data[i].buttons, &buttons, sizeof(uint32_t));
+            }
         }
     }
 }
