@@ -28,6 +28,8 @@ add_executable(${PROJECT_NAME}
   src/profile.c
 )
 
+set_source_files_properties(src/bt.c PROPERTIES COMPILE_FLAGS "-ffast-math -fno-math-errno")
+
 target_link_libraries(${PROJECT_NAME}
   gcc
   taihenForKernel_stub
