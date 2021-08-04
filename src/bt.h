@@ -22,10 +22,7 @@ typedef enum {
     PSVS_MOTION_FLAG_ALL = 7,
 } psvs_motion_flags_t;
 
-extern int32_t psvs_bt_debug_x;
-extern int32_t psvs_bt_debug_y;
-extern int32_t psvs_bt_debug_z;
-extern int32_t psvs_bt_debug_w;
+
 
 void psvs_bt_init();
 void psvs_bt_done();
@@ -37,6 +34,7 @@ int psvs_bt_touch_filter_input(bool peek, uint32_t port, SceTouchData *pData, ui
 int psvs_bt_motion_filter_state(SceMotionState * motionState);
 int psvs_bt_motion_filter_sensorstate(SceMotionSensorState *sensorState, int numRecords);
 
+void psvs_bt_motion_reset();
 bool psvs_bt_motion_get_flag(psvs_motion_flags_t flag);
 void psvs_bt_motion_set_flag(psvs_motion_flags_t flag, bool enabled);
 
