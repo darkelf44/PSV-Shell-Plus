@@ -920,7 +920,7 @@ static void _psvs_gui_draw_page_1_item(int offset, int line, int id, int size, c
 }
 
 static const char * psvs_gui_button_title[2] = { "off", " on"};
-static const char * psvs_gui_bt_touch_title[PSVS_BT_TOUCH_MAX] = { "  off", "  F/B", "F/B/X"};
+static const char * psvs_gui_bt_touch_title[PSVS_BT_TOUCH_MAX] = { "  off", "front", "  F/B", "F/B/X"};
 static const char * psvs_gui_bt_motion_title[PSVS_BT_MOTION_MAX] = { "     off", "  normal", "vertical"};
 
 void psvs_gui_draw_page_1_content() {
