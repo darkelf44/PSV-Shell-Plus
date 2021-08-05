@@ -454,6 +454,10 @@ static void _psvs_gui_prchar(const char character, int x, int y) {
             uint32_t charPosH = charPos + (yy_font * (((g_gui_font_width - 1) / 8) + 1));
             uint8_t charByte = g_gui_font[charPosH + (xx_font / 8)];
 
+            // Fix missing lines
+            if (g_gui_font_scale < 0.75 && yy > 0)
+                charByte |= g_gui_font[charPosH + (((g_gui_font_width - 1) / 8) + 1) + (xx_font / 8)];
+
             rgba_t color = ((charByte >> (7 - (xx_font % 8))) & 1) ? g_gui_color_text : g_gui_color_bg;
             *(px + xx) = color;
         }
