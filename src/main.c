@@ -334,11 +334,24 @@ static int sceMotionDevSamplingStop_patched(void) {
 
 static int sceMotionDevRead_patched(SceMotionDevResult * resultList, int maxResult, int * setFlag) {
     int result = TAI_CONTINUE(int, g_hookrefs[26], resultList, maxResult, setFlag);
+	if (g_profile.bt_motion) {
+		result = psvs_bt_motion_filter_read(resultList, maxResult, setFlag);
+	}
     return result;
 }
 
 static int sceMotionDevGetDeviceInfo_patched(uint32_t * deviceInfo) {
     int result = TAI_CONTINUE(int, g_hookrefs[27], deviceInfo);
+
+	uint32_t buffer;
+	if (g_is_motion_dev_dummy) {
+		result = psvs_bt_motion_reset_device_info(&buffer);
+		ksceKernelMemcpyKernelToUser((uintptr_t)deviceInfo, &buffer, sizeof(buffer));
+	} else if (result >= 0) {
+		ksceKernelMemcpyUserToKernel(&buffer, (uintptr_t)deviceInfo, sizeof(buffer));
+		psvs_bt_motion_set_device_info(&buffer);
+	}
+
     return result;
 }
 

@@ -178,7 +178,7 @@ typedef struct psvs_motion_info_t {
 	// Flags for gyro and accel
 	int8_t gyro_flags;
 	int8_t accel_flags;
-	
+
     // Axis flis for gyro and accel (based on device info)
     int8_t gyro_axis_flip[3];
     int8_t accel_axis_flip[3];
@@ -488,7 +488,7 @@ void psvs_bt_on_hid_transfer(SceBtHidRequest * head) {
                     // Process DS3 input
                     //psvs_ds3_input_report_t * report = (psvs_ds3_input_report_t*) request->buffer;
 
-                    // FUTURE: Maybe I get a DS3, I'll implement this
+                    // FUTURE: Maybe if I get a DS3, I'll implement this
                 }
             } else if (g_gamepad.type == PSVS_GAMEPAD_DS4) {
                 if ((request->type == 0) && request->buffer && request->length >= sizeof(psvs_ds4_input_report_t)) {
@@ -498,7 +498,7 @@ void psvs_bt_on_hid_transfer(SceBtHidRequest * head) {
                     // Last input
                     if (!request->next) {
                         // Frame data (from previous frame)
-                        psvs_motion_frame_t frame = g_gamepad.motion.frames[g_gamepad.motion.last];
+                        psvs_motion_frame_t frame;
 
                         // Add raw motion data (one radian ~ 940 an DS4)
                         frame.gyro.x = report->gyro_x * (360.0f / (TAU * 940));
@@ -578,15 +578,54 @@ int psvs_bt_touch_filter_input(bool peek, uint32_t port, SceTouchData *pData, ui
     return nBufs;
 }
 
-int psvs_bt_motion_filter_read(SceMotionDevResult * resultList, uint32_t count, uint32_t * flags) {
-	return count;
+int psvs_bt_motion_filter_read(SceMotionDevResult * resultList, uint32_t count, int * setFlag) {
+
+	// Kernel side data buffer
+	SceMotionDevResult buffer;
+
+	// Count is always 64, but it does not hurt to check
+	if (count == 0)
+		return count;
+
+    // Get latest frame
+    int last = __atomic_load_n(&g_gamepad.motion.last, __ATOMIC_SEQ_CST); // Atomic ensures that we never read the buffer that is currently written
+    psvs_motion_frame_t frame = g_gamepad.motion.frames[last];
+
+    // Fill out buffer
+	buffer.timestamp = frame.timestamp;
+	buffer.entryCount = 1;
+	buffer.magnCalibIndex = 0;
+	buffer.magnFieldStab = 0;
+	buffer.gyroCalibIndex = 0;
+	buffer.timeInMSec = ksceKernelGetSystemTimeWide();
+
+	// Fill out entry
+	buffer.entryList[0].flags = SCE_MOTION_DEV_ENTRY_HAS_GYRO_DATA | SCE_MOTION_DEV_ENTRY_HAS_ACCEL_DATA;
+	frame.gyro.x = frame.gyro.x * (frame.gyro.x > 0.0f ? g_gamepad.motion.gyroPosScale.x : g_gamepad.motion.gyroNegScale.x);
+	frame.gyro.y = frame.gyro.y * (frame.gyro.y > 0.0f ? g_gamepad.motion.gyroPosScale.y : g_gamepad.motion.gyroNegScale.y);
+	frame.gyro.z = frame.gyro.z * (frame.gyro.z > 0.0f ? g_gamepad.motion.gyroPosScale.z : g_gamepad.motion.gyroNegScale.z);
+	buffer.entryList[0].gyro_x = (short) (0.5f + frame.gyro.x + g_gamepad.motion.gyroZero.x);
+	buffer.entryList[0].gyro_y = (short) (0.5f + frame.gyro.y + g_gamepad.motion.gyroZero.y);
+	buffer.entryList[0].gyro_z = (short) (0.5f + frame.gyro.z + g_gamepad.motion.gyroZero.z);
+	frame.accel.x = frame.accel.x * (frame.accel.x > 0.0f ? g_gamepad.motion.accelPosScale.x : g_gamepad.motion.accelNegScale.x);
+	frame.accel.y = frame.accel.y * (frame.accel.y > 0.0f ? g_gamepad.motion.accelPosScale.y : g_gamepad.motion.accelNegScale.y);
+	frame.accel.z = frame.accel.z * (frame.accel.z > 0.0f ? g_gamepad.motion.accelPosScale.z : g_gamepad.motion.accelNegScale.z);
+	buffer.entryList[0].accel_x = (short) (0.5f + frame.accel.x + g_gamepad.motion.accelZero.x);
+	buffer.entryList[0].accel_y = (short) (0.5f + frame.accel.y + g_gamepad.motion.accelZero.y);
+	buffer.entryList[0].accel_z = (short) (0.5f + frame.accel.z + g_gamepad.motion.accelZero.z);
+
+	// Copy to user buffer
+	ksceKernelMemcpyKernelToUser((uintptr_t)resultList, &buffer, sizeof(buffer));
+
+	// For now only a single event for each call
+	return 1;
 }
 
 void psvs_bt_motion_set_device_info(const uint32_t * info) {
 	// TODO: Implement
 }
 
-void psvs_bt_motion_set_gyro_bias(SceMotionDevGyroBias * bias) {
+void psvs_bt_motion_set_gyro_bias(const SceMotionDevGyroBias * bias) {
 	// TODO: Implement
 }
 
@@ -594,7 +633,7 @@ void psvs_bt_motion_set_gyro_calib_data(const SceMotionDevGyroCalibData * data) 
 	// TODO: Implement
 }
 
-void psvs_bt_motion_set_accel_calib_data(SceMotionDevAccCalibData * data) {
+void psvs_bt_motion_set_accel_calib_data(const SceMotionDevAccCalibData * data) {
 	// TODO: Implement
 }
 

@@ -1,6 +1,12 @@
 #ifndef _BT_H_
 #define _BT_H_
 
+enum {
+    SCE_MOTION_DEV_ENTRY_HAS_GYRO_DATA = 1 << 0,
+    SCE_MOTION_DEV_ENTRY_HAS_ACCEL_DATA = 1 << 2,
+    SCE_MOTION_DEV_ENTRY_HAS_MAGNETOMETER_DATA = 1 << 3,
+};
+
 typedef struct {
     /* 00 */ int32_t reserved;
     /* 04 */ SceFVector3 zero;
@@ -89,12 +95,12 @@ bool psvs_bt_connected(unsigned int mac0, unsigned int mac1);
 void psvs_bt_on_hid_transfer(SceBtHidRequest * request);
 
 int psvs_bt_touch_filter_input(bool peek, uint32_t port, SceTouchData *pData, uint32_t nBufs);
-int psvs_bt_motion_filter_read(SceMotionDevResult * resultList, uint32_t count, uint32_t * flags);
+int psvs_bt_motion_filter_read(SceMotionDevResult * resultList, uint32_t count, int * setFlag);
 
 void psvs_bt_motion_set_device_info(const uint32_t * info);
-void psvs_bt_motion_set_gyro_bias(SceMotionDevGyroBias * bias);
+void psvs_bt_motion_set_gyro_bias(const SceMotionDevGyroBias * bias);
 void psvs_bt_motion_set_gyro_calib_data(const SceMotionDevGyroCalibData * data);
-void psvs_bt_motion_set_accel_calib_data(SceMotionDevAccCalibData * data);
+void psvs_bt_motion_set_accel_calib_data(const SceMotionDevAccCalibData * data);
 
 int psvs_bt_motion_reset_device_info(uint32_t * info);
 int psvs_bt_motion_reset_gyro_bias(SceMotionDevGyroBias * bias);
