@@ -1,4 +1,22 @@
-# PSVshell
+# PSVshell+
+
+This is a fork of PSVshell, called PSVshell+. It adds a number of extra features,  mostly for PS TV owners
+(like myself), but others can find it useful too.
+
+## Extra features
+
+- Swap the cross and cirle buttons for playing japanese games
+- Disable L3 and R3 (the stick buttons) to precent you from accidentally pressing them.
+- DS4 touchpad emulation. This has three modes:
+  - **front:** Use the thouchpad to emulate the front touchscreen
+  - **F/B:** Emulated both the front and the back thouchpad, usign the touchpad button to toggle between them
+  - **F/B/X:** Same as "F/B", but it toggles between front, back and off, not just front and back.
+- DS4 motion emulation. This has two modes:
+  - **normal:** The DS4 controller has the same orientation as the Vita.
+  - **vertical:** The DS4 held horizontally has the orientation of the Vita held vertically.
+ 
+
+# Original readme
 Yet another overclocking plugin
 
 ## Features:

@@ -585,7 +585,7 @@ int psvs_bt_motion_filter_read(SceMotionDevResult * resultList, uint32_t count, 
 
     // Fill out buffer
 	buffer.timestamp = frame.timestamp;
-	buffer.entryCount = 5;
+	buffer.entryCount = 1;
 	buffer.magnCalibIndex = 0;
 	buffer.magnFieldStab = 0;
 	buffer.gyroCalibIndex = 0;
@@ -626,16 +626,10 @@ int psvs_bt_motion_filter_read(SceMotionDevResult * resultList, uint32_t count, 
 		buffer.entryList[0].accel_z = (uint16_t) (0.5f + frame.accel.z + g_gamepad.motion.accelZero.z);
 
 		// Convert gyro to uint16_t with offset
-		buffer.entryList[0].gyro_y = (uint16_t) (0.5f - frame.gyro.x + g_gamepad.motion.gyroZero.x);
+		buffer.entryList[0].gyro_y = (uint16_t) (0.5f + frame.gyro.x + g_gamepad.motion.gyroZero.x);
 		buffer.entryList[0].gyro_x = (uint16_t) (0.5f - frame.gyro.y + g_gamepad.motion.gyroZero.y);
 		buffer.entryList[0].gyro_z = (uint16_t) (0.5f + frame.gyro.z + g_gamepad.motion.gyroZero.z);
 	}
-
-	// Mitigate delay
-	buffer.entryList[1] = buffer.entryList[0];
-	buffer.entryList[2] = buffer.entryList[0];
-	buffer.entryList[3] = buffer.entryList[0];
-	buffer.entryList[4] = buffer.entryList[0];
 
 	// Copy to user buffer
 	ksceKernelMemcpyKernelToUser((uintptr_t)resultList, &buffer, sizeof(buffer));
