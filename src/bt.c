@@ -249,11 +249,6 @@ static psvs_gamepad_t g_gamepad = {
 
 #define PSVS_MOTION_DEADBAND_THRESHOLD (TAU/0x200)
 
-#define SCE_MOTION_ERROR_NULL_PARAMETER 0x80360209
-#define SCE_MOTION_ERROR_NOT_SAMPLING 0x80360206
-#define SCE_MOTION_ERROR_ALREADY_SAMPLING 0x80360207
-#define SCE_MOTION_ERROR_OUT_OF_BOUNDS 0x80360205
-
 INLINE static float _psvs_clamp(float x, float lo, float hi) {
     return (x > hi) ? hi : (x < lo) ? lo : x;
 }
@@ -261,93 +256,6 @@ INLINE static float _psvs_clamp(float x, float lo, float hi) {
 INLINE static float _psvs_vec_len3(float x, float y, float z) {
     float r = x * x + y * y + z * z;
     return (r > 0.0f) ? __builtin_sqrt(r) : 0.0f;
-}
-
-INLINE static float _psvs_vec_len4(float x, float y, float z, float w) {
-    float r = x * x + y * y + z * z + w * w;
-    return (r > 0.0f) ? __builtin_sqrt(r) : 0.0f;
-}
-
-// Sine function in the [-TAU/4, +TAU/4] range
-INLINE static float _psvs_small_sin(float angle) {
-    return ((0.00762664*angle*angle - 0.166017)*angle*angle + 0.999875)*angle;
-}
-
-// Cosine function in the [-TAU/2, +TAU/2] range
-INLINE static float _psvs_small_cos(float angle) {
-    if (angle < 0)
-        angle = -angle;
-    return _psvs_small_sin(TAU/4-angle);
-}
-
-// Full range sine function
-static float _psvs_sin(float angle) {
-    // Separate sign and magnitude
-    bool sign = false;
-    if (angle < 0.0f) {
-        angle = -angle;
-        sign = true;
-    }
-
-    // Extend the range of the function
-    if (angle < TAU/4) {
-        // value is in range
-    } else if (angle < 3/4*TAU) {
-        // Remove half a circle
-        angle -= TAU/2;
-    } else if (angle < 5/4*TAU) {
-        // Remove a full circle
-        angle -= TAU;
-    } else {
-        // Remove multiple half cirles
-        do {
-            int32_t d = (int32_t) ((angle - TAU/4) / (TAU/2));
-            angle -= d * (TAU/2);
-        } while (angle > TAU/4); // Prevent errors due to insufficient precision
-    }
-
-    // apply sign
-    if (sign)
-        angle = -angle;
-
-    // Call small range sin function
-    return _psvs_small_sin(angle);
-}
-
-// Full range cosine function
-static float _psvs_cos(float angle) {
-    // Discard sign
-    if (angle < 0.0f) {
-        angle = -angle;
-    }
-
-    // Extend the range of the function
-    if (angle < TAU/2) {
-        // value is in range
-    } else if (angle < 3/2 *TAU) {
-        // Remove a circle
-        angle -= TAU;
-    } else {
-        // Remove multiple cirles
-        do {
-            int32_t d = (int32_t) ((angle - TAU/2) / TAU);
-            angle -= d * TAU;
-        } while (angle > TAU/2); // Prevent errors due to insufficient precision
-    }
-
-    // Call small range cos function
-    return _psvs_small_cos(angle);
-}
-
-// Multiply quaternions
-static psvs_float4_t _psvs_quat_mul(psvs_float4_t * left, psvs_float4_t * right) {
-    psvs_float4_t result = {
-        .x = left->x * right->w + left->w * right->x + left->y * right->z - left->z * right->y,
-        .y = left->y * right->w + left->w * right->y + left->z * right->x - left->x * right->z,
-        .z = left->z * right->w + left->w * right->z + left->x * right->y - left->y * right->x,
-        .w = left->w * right->w - left->x * right->x - left->y * right->y - left->z * right->z,
-    };
-    return result;
 }
 
 void psvs_bt_init() {
