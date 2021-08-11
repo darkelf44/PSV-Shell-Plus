@@ -1,20 +1,32 @@
-# PSVshell+
+# PSV Shell Plus
 
-This is a fork of PSVshell, called PSVshell+. It adds a number of extra features,  mostly for PS TV owners
+This is a fork of PSVshell, called PSVShell+. It adds a number of extra features,  mostly for PS TV owners
 (like myself), but others can find it useful too.
 
 ## Extra features
 
 - Swap the cross and cirle buttons for playing japanese games
-- Disable L3 and R3 (the stick buttons) to precent you from accidentally pressing them.
+- Disable **L3** and **R3** (the stick buttons) to prevent you from accidentally pressing them
 - DS4 touchpad emulation. This has three modes:
   - **front:** Use the thouchpad to emulate the front touchscreen
   - **F/B:** Emulated both the front and the back thouchpad, usign the touchpad button to toggle between them
-  - **F/B/X:** Same as "F/B", but it toggles between front, back and off, not just front and back.
+  - **F/B/X:** Same as "F/B", but it toggles between front, back and off, not just front and back
 - DS4 motion emulation. This has two modes:
-  - **normal:** The DS4 controller has the same orientation as the Vita.
-  - **vertical:** The DS4 held horizontally has the orientation of the Vita held vertically.
- 
+  - **normal:** The DS4 controller has the same orientation as the Vita
+  - **vertical:** The DS4 held horizontally has the orientation of the Vita held vertically
+- Reboot or shutdown the Vita. This just seemed nice to have on hand.
+
+In the "FULL" mode, there are now two pages, that you can switch between using **L** and **R**. The main page is the
+same as it was in PSVshell. All the extra features added by PSVShell+ are on the second page.
+
+Saving the profile on the main page (below the clock speeds) also save the extra features in the same manner.
+
+## Acknowledgments
+
+- To [Electry](https://github.com/Electry) for the original [PSVshell](https://github.com/Electry/PSVshell)
+- To [MERLev](https://github.com/MERLev) for [ds4Touch](https://github.com/MERLev/ds4Touch)
+- To [OperationNT414C](https://github.com/OperationNT414C) for [DSMotion](https://github.com/OperationNT414C/DSMotion)
+- And a big thank you to [VitaSDK](https://github.com/vitasdk) for making this all possible.
 
 # Original readme
 Yet another overclocking plugin

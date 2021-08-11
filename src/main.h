@@ -2,8 +2,8 @@
 #define _MAIN_H_
 #include "perf.h"
 
-#define PSVS_VERSION_STRING "PSVShell+ [indev]"
-#define PSVS_VERSION_VER    "PSVP0000"
+#define PSVS_VERSION_STRING "PSVShell+ v0.1"
+#define PSVS_VERSION_VER    "PSVP0100"
 
 #define DECL_FUNC_HOOK_PATCH_CTRL(index, name) \
     static int name##_patched(int port, SceCtrlData *pad_data, int count) { \
