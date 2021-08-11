@@ -56,7 +56,7 @@ typedef struct {
     /* 16 */    uint16_t magn_x;
     /* 18 */    uint16_t magn_y;
     /* 1A */    uint16_t magn_z;
-    /* 1C */    uint16_t reserved[8];
+    /* 1C */    uint16_t reserved[4];
 } SceMotionDevEntry;    /* 24 */
 
 typedef struct {

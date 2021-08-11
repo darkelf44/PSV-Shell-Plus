@@ -88,7 +88,7 @@ struct psvs_ds4_input_report_t {
     signed short gyro_y;     // +Y is right to forward (around up-down axis)
     signed short gyro_z;     // +Z is right to up (around forward-backward axis)
 
-    // This is the direction of accelearation (gravity), compared to the controller
+    // This is the direction of acceleration (gravity), compared to the controller
     signed short accel_x;    // +X is left
     signed short accel_y;    // +Y is down
     signed short accel_z;    // +Z is forward
@@ -253,13 +253,6 @@ static psvs_gamepad_t g_gamepad = {
 #define SCE_MOTION_ERROR_NOT_SAMPLING 0x80360206
 #define SCE_MOTION_ERROR_ALREADY_SAMPLING 0x80360207
 #define SCE_MOTION_ERROR_OUT_OF_BOUNDS 0x80360205
-
-int32_t psvs_bt_debug_x = 0;
-int32_t psvs_bt_debug_y = 0;
-int32_t psvs_bt_debug_z = 0;
-int32_t psvs_bt_debug_u = 0;
-int32_t psvs_bt_debug_v = 0;
-int32_t psvs_bt_debug_w = 0;
 
 INLINE static float _psvs_clamp(float x, float lo, float hi) {
     return (x > hi) ? hi : (x < lo) ? lo : x;
@@ -500,10 +493,10 @@ void psvs_bt_on_hid_transfer(SceBtHidRequest * head) {
                         // Frame data (from previous frame)
                         psvs_motion_frame_t frame;
 
-                        // Add raw motion data (one radian ~ 940 an DS4)
-                        frame.gyro.x = report->gyro_x * (360.0f / (TAU * 940));
-                        frame.gyro.y = report->gyro_y * (360.0f / (TAU * 940));
-                        frame.gyro.z = report->gyro_z * (360.0f / (TAU * 940));
+                        // Add raw motion data (degree / sec)
+                        frame.gyro.x = report->gyro_x * 0.064f;
+                        frame.gyro.y = report->gyro_y * 0.064f;
+                        frame.gyro.z = report->gyro_z * 0.064f;
 
                         // Convert acceleration data (one G ~ 8200 ~ 0x2000 on DS4)
                         frame.accel.x = report->accel_x / (float) 0x2000;
@@ -511,7 +504,6 @@ void psvs_bt_on_hid_transfer(SceBtHidRequest * head) {
                         frame.accel.z = report->accel_z / (float) 0x2000;
 
                         // Update timestamp and counter
-                        uint32_t dt = g_gamepad.timestamp - frame.timestamp;
                         frame.counter = g_gamepad.motion.counter ++;
                         frame.timestamp = g_gamepad.timestamp;
 
@@ -593,26 +585,57 @@ int psvs_bt_motion_filter_read(SceMotionDevResult * resultList, uint32_t count, 
 
     // Fill out buffer
 	buffer.timestamp = frame.timestamp;
-	buffer.entryCount = 1;
+	buffer.entryCount = 5;
 	buffer.magnCalibIndex = 0;
 	buffer.magnFieldStab = 0;
 	buffer.gyroCalibIndex = 0;
-	buffer.timeInMSec = ksceKernelGetSystemTimeWide();
+	buffer.timeInMSec = ksceKernelGetSystemTimeWide() / 1000;
 
 	// Fill out entry
 	buffer.entryList[0].flags = SCE_MOTION_DEV_ENTRY_HAS_GYRO_DATA | SCE_MOTION_DEV_ENTRY_HAS_ACCEL_DATA;
-	frame.gyro.x = frame.gyro.x * (frame.gyro.x > 0.0f ? g_gamepad.motion.gyroPosScale.x : g_gamepad.motion.gyroNegScale.x);
-	frame.gyro.y = frame.gyro.y * (frame.gyro.y > 0.0f ? g_gamepad.motion.gyroPosScale.y : g_gamepad.motion.gyroNegScale.y);
-	frame.gyro.z = frame.gyro.z * (frame.gyro.z > 0.0f ? g_gamepad.motion.gyroPosScale.z : g_gamepad.motion.gyroNegScale.z);
-	buffer.entryList[0].gyro_x = (short) (0.5f + frame.gyro.x + g_gamepad.motion.gyroZero.x);
-	buffer.entryList[0].gyro_y = (short) (0.5f + frame.gyro.y + g_gamepad.motion.gyroZero.y);
-	buffer.entryList[0].gyro_z = (short) (0.5f + frame.gyro.z + g_gamepad.motion.gyroZero.z);
-	frame.accel.x = frame.accel.x * (frame.accel.x > 0.0f ? g_gamepad.motion.accelPosScale.x : g_gamepad.motion.accelNegScale.x);
-	frame.accel.y = frame.accel.y * (frame.accel.y > 0.0f ? g_gamepad.motion.accelPosScale.y : g_gamepad.motion.accelNegScale.y);
-	frame.accel.z = frame.accel.z * (frame.accel.z > 0.0f ? g_gamepad.motion.accelPosScale.z : g_gamepad.motion.accelNegScale.z);
-	buffer.entryList[0].accel_x = (short) (0.5f + frame.accel.x + g_gamepad.motion.accelZero.x);
-	buffer.entryList[0].accel_y = (short) (0.5f + frame.accel.y + g_gamepad.motion.accelZero.y);
-	buffer.entryList[0].accel_z = (short) (0.5f + frame.accel.z + g_gamepad.motion.accelZero.z);
+
+	// Scale acceleration
+	frame.accel.x *= (frame.accel.x > 0.0f ? g_gamepad.motion.accelPosScale.x : g_gamepad.motion.accelNegScale.x);
+	frame.accel.y *= (frame.accel.y > 0.0f ? g_gamepad.motion.accelPosScale.y : g_gamepad.motion.accelNegScale.y);
+	frame.accel.z *= (frame.accel.z > 0.0f ? g_gamepad.motion.accelPosScale.z : g_gamepad.motion.accelNegScale.z);
+
+	// Scale gyro
+	frame.gyro.x *= (frame.gyro.x > 0.0f ? g_gamepad.motion.gyroPosScale.x : g_gamepad.motion.gyroNegScale.x);
+	frame.gyro.y *= (frame.gyro.y > 0.0f ? g_gamepad.motion.gyroPosScale.y : g_gamepad.motion.gyroNegScale.y);
+	frame.gyro.z *= (frame.gyro.z > 0.0f ? g_gamepad.motion.gyroPosScale.z : g_gamepad.motion.gyroNegScale.z);
+
+	// Apply orientation (accel_y and accel_x are swapped by SceMotion)
+	if (g_profile.bt_motion == PSVS_BT_MOTION_NORMAL) {
+		// TODO: Axis flips
+
+		// Convert acceleration to uint16_t with offset
+		buffer.entryList[0].accel_y = (uint16_t) (0.5f + frame.accel.x + g_gamepad.motion.accelZero.x);
+		buffer.entryList[0].accel_x = (uint16_t) (0.5f + frame.accel.z + g_gamepad.motion.accelZero.z);
+		buffer.entryList[0].accel_z = (uint16_t) (0.5f + frame.accel.y + g_gamepad.motion.accelZero.y);
+
+		// Convert gyro to uint16_t with offset
+		buffer.entryList[0].gyro_y = (uint16_t) (0.5f + frame.gyro.x + g_gamepad.motion.gyroZero.x);
+		buffer.entryList[0].gyro_x = (uint16_t) (0.5f + frame.gyro.z + g_gamepad.motion.gyroZero.z);
+		buffer.entryList[0].gyro_z = (uint16_t) (0.5f + frame.gyro.y + g_gamepad.motion.gyroZero.y);
+	} else {
+		// TODO: Axis flips
+
+		// Convert acceleration to uint16_t with offset
+		buffer.entryList[0].accel_y = (uint16_t) (0.5f + frame.accel.x + g_gamepad.motion.accelZero.x);
+		buffer.entryList[0].accel_x = (uint16_t) (0.5f - frame.accel.y + g_gamepad.motion.accelZero.y);
+		buffer.entryList[0].accel_z = (uint16_t) (0.5f + frame.accel.z + g_gamepad.motion.accelZero.z);
+
+		// Convert gyro to uint16_t with offset
+		buffer.entryList[0].gyro_y = (uint16_t) (0.5f - frame.gyro.x + g_gamepad.motion.gyroZero.x);
+		buffer.entryList[0].gyro_x = (uint16_t) (0.5f - frame.gyro.y + g_gamepad.motion.gyroZero.y);
+		buffer.entryList[0].gyro_z = (uint16_t) (0.5f + frame.gyro.z + g_gamepad.motion.gyroZero.z);
+	}
+
+	// Mitigate delay
+	buffer.entryList[1] = buffer.entryList[0];
+	buffer.entryList[2] = buffer.entryList[0];
+	buffer.entryList[3] = buffer.entryList[0];
+	buffer.entryList[4] = buffer.entryList[0];
 
 	// Copy to user buffer
 	ksceKernelMemcpyKernelToUser((uintptr_t)resultList, &buffer, sizeof(buffer));
@@ -696,9 +719,9 @@ int psvs_bt_motion_reset_gyro_calib_data(SceMotionDevGyroCalibData * data) {
 	data->yNeg.x = 0x8000;
 	data->yNeg.y = 0;
 	data->yNeg.z = 0x8000;
-	data->yNeg.z = 0x8000;
-	data->yNeg.z = 0;
-	data->yNeg.z = 0x8000;
+	data->zNeg.x = 0x8000;
+	data->zNeg.y = 0x8000;
+	data->zNeg.z = 0;
 	// Return SCE_OK
 	return 0;
 }
@@ -736,9 +759,9 @@ int psvs_bt_motion_reset_accel_calib_data(SceMotionDevAccCalibData * data) {
 	data->yNeg.x = 0x8000;
 	data->yNeg.y = 0;
 	data->yNeg.z = 0x8000;
-	data->yNeg.z = 0x8000;
-	data->yNeg.z = 0;
-	data->yNeg.z = 0x8000;
+	data->zNeg.x = 0x8000;
+	data->zNeg.y = 0x8000;
+	data->zNeg.z = 0;
 	// Return SCE_OK
 	return 0;
 }
