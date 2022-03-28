@@ -540,7 +540,7 @@ int psvs_bt_motion_filter_read(SceMotionDevResult * resultList, uint32_t count, 
 	}
 
 	// Copy to user buffer
-	ksceKernelMemcpyKernelToUser((uintptr_t)resultList, &buffer, sizeof(buffer));
+	ksceKernelMemcpyKernelToUser(resultList, &buffer, sizeof(buffer));
 
 	// For now only a single event for each call
 	return 1;

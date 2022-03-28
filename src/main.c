@@ -16,7 +16,7 @@
 int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintptr_t *addr);
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
 bool ksceAppMgrIsExclusiveProcessRunning();
-bool ksceSblAimgrIsGenuineDolce();
+//bool ksceSblAimgrIsGenuineDolce();
 //bool ksceSblACMgrIsPspEmu(SceUID pid);
 //bool ksceSblACMgrIsSceShell(SceUID pid);
 
@@ -64,12 +64,12 @@ static void psvs_input_filter(SceCtrlData *pad_data, int count) {
         if (psvs_gui_get_mode() == PSVS_GUI_MODE_FULL) {
             // GUI is open, do not pass any input to the app
             for (int i = 0; i < count; ++ i)
-                ksceKernelMemcpyKernelToUser((uintptr_t)&pad_data[i].buttons, &buttons, sizeof(uint32_t));
+                ksceKernelMemcpyKernelToUser(&pad_data[i].buttons, &buttons, sizeof(uint32_t));
         } else if (g_profile.swap_buttons || g_profile.disable_L3R3) {
             // GUI is close, filter input according to profile
             for (int i = 0; i < count; ++ i) {
                 // Read pressed buttons
-                ksceKernelMemcpyUserToKernel(&buttons, (uintptr_t)&pad_data[i].buttons, sizeof(uint32_t));
+                ksceKernelMemcpyUserToKernel(&buttons, &pad_data[i].buttons, sizeof(uint32_t));
 
                 // Swap Cross and Circle buttons
                 if (g_profile.swap_buttons) {
@@ -84,7 +84,7 @@ static void psvs_input_filter(SceCtrlData *pad_data, int count) {
                 }
 
                 // Write pressed buttons
-                ksceKernelMemcpyKernelToUser((uintptr_t)&pad_data[i].buttons, &buttons, sizeof(uint32_t));
+                ksceKernelMemcpyKernelToUser(&pad_data[i].buttons, &buttons, sizeof(uint32_t));
             }
         }
     }
@@ -346,9 +346,9 @@ static int sceMotionDevGetDeviceInfo_patched(uint32_t * deviceInfo) {
 	uint32_t buffer;
 	if (g_is_motion_dev_dummy) {
 		result = psvs_bt_motion_reset_device_info(&buffer);
-		ksceKernelMemcpyKernelToUser((uintptr_t)deviceInfo, &buffer, sizeof(buffer));
+		ksceKernelMemcpyKernelToUser(deviceInfo, &buffer, sizeof(buffer));
 	} else if (result >= 0) {
-		ksceKernelMemcpyUserToKernel(&buffer, (uintptr_t)deviceInfo, sizeof(buffer));
+		ksceKernelMemcpyUserToKernel(&buffer, deviceInfo, sizeof(buffer));
 		psvs_bt_motion_set_device_info(&buffer);
 	}
 
@@ -361,9 +361,9 @@ static int sceMotionDevGetGyroBias_patched(SceMotionDevGyroBias * bias) {
 	SceMotionDevGyroBias buffer;
 	if (g_is_motion_dev_dummy) {
 		result = psvs_bt_motion_reset_gyro_bias(&buffer);
-		ksceKernelMemcpyKernelToUser((uintptr_t)bias, &buffer, sizeof(buffer));
+		ksceKernelMemcpyKernelToUser(bias, &buffer, sizeof(buffer));
 	} else if (result >= 0) {
-		ksceKernelMemcpyUserToKernel(&buffer, (uintptr_t)bias, sizeof(buffer));
+		ksceKernelMemcpyUserToKernel(&buffer, bias, sizeof(buffer));
 		psvs_bt_motion_set_gyro_bias(&buffer);
 	}
 
@@ -376,9 +376,9 @@ static int sceMotionDevGetGyroCalibData_patched(SceMotionDevGyroCalibData * data
 	SceMotionDevGyroCalibData buffer;
 	if (g_is_motion_dev_dummy) {
 		result = psvs_bt_motion_reset_gyro_calib_data(&buffer);
-		ksceKernelMemcpyKernelToUser((uintptr_t)data, &buffer, sizeof(buffer));
+		ksceKernelMemcpyKernelToUser(data, &buffer, sizeof(buffer));
 	} else if (result >= 0) {
-		ksceKernelMemcpyUserToKernel(&buffer, (uintptr_t)data, sizeof(buffer));
+		ksceKernelMemcpyUserToKernel(&buffer, data, sizeof(buffer));
 		psvs_bt_motion_set_gyro_calib_data(&buffer);
 	}
 
@@ -391,9 +391,9 @@ static int sceMotionDevGetAccCalibData_patched(SceMotionDevAccCalibData * data) 
 	SceMotionDevAccCalibData buffer;
 	if (g_is_motion_dev_dummy) {
 		result = psvs_bt_motion_reset_accel_calib_data(&buffer);
-		ksceKernelMemcpyKernelToUser((uintptr_t)data, &buffer, sizeof(buffer));
+		ksceKernelMemcpyKernelToUser(data, &buffer, sizeof(buffer));
 	} else if (result >= 0) {
-		ksceKernelMemcpyUserToKernel(&buffer, (uintptr_t)data, sizeof(buffer));
+		ksceKernelMemcpyUserToKernel(&buffer, data, sizeof(buffer));
 		psvs_bt_motion_set_accel_calib_data(&buffer);
 	}
 
