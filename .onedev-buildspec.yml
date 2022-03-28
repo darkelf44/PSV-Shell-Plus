@@ -12,7 +12,7 @@ jobs:
     name: Build
     runInContainer: true
     image: local/vitasdk
-    interpreter: !DefaultInterpreter
+    interpreter: !BashInterpreter
       commands:
       - '# Each command must succeed'
       - set -e
@@ -28,14 +28,18 @@ jobs:
       - cmake ..
       - make all
       - ''
-      - '# Create artifacts'
-      - cd $root
-      - tar -cf "build-${branch}-${commit:0:8}.tar" -P build *.skprx
+      - '# Copy artifacts'
+      - mkdir $root/release
+      - cp psvshell+.skprx $root/release/
+      - ''
+      - '# Create release zip'
+      - cd $root/release
+      - zip $root/release-${branch}.zip *
     useTTY: false
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   - !PublishArtifactStep
     name: Publish
-    artifacts: build-*.tar
+    artifacts: release-*.zip
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   - !CommandStep
     name: Cleanup
@@ -44,8 +48,13 @@ jobs:
     interpreter: !DefaultInterpreter
       commands:
       - rm -r build
+      - rm -r release
+      - rm release-*.zip
     useTTY: false
     condition: ALWAYS
+  triggers:
+  - !BranchUpdateTrigger
+    branches: master
   retryCondition: never
   maxRetries: 3
   retryDelay: 30
