@@ -214,6 +214,10 @@ void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
                 g_profile_has_changed = true;
                 break;
 
+            case PSVS_GUI_EXTRA_FPS_LIMIT:
+                g_session.fps_limit = g_session.fps_limit ? (g_session.fps_limit == 30) ? 15 : 0 : 30;
+                break;
+
             case PSVS_GUI_EXTRA_RESTART:
                 kscePowerRequestColdReset();
                 break;
@@ -255,6 +259,12 @@ void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
                     g_profile_has_changed = true;
                 }
                 break;
+
+            case PSVS_GUI_EXTRA_FPS_LIMIT:
+                if (g_session.fps_limit > 0) {
+                    -- g_session.fps_limit;
+                }
+                break;
         }
     }
     else if (buttons_down & SCE_CTRL_RIGHT) {
@@ -284,6 +294,12 @@ void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
                 if (g_profile.bt_motion < PSVS_BT_MOTION_MAX - 1) {
                     ++ g_profile.bt_motion;
                     g_profile_has_changed = true;
+                }
+                break;
+
+            case PSVS_GUI_EXTRA_FPS_LIMIT:
+                if (g_session.fps_limit < 30) {
+                    ++ g_session.fps_limit;
                 }
                 break;
         }
