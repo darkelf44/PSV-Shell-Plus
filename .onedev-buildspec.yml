@@ -32,6 +32,11 @@ jobs:
       - mkdir $root/release
       - cp psvshell+.skprx $root/release/
       - ''
+      - '# Generate release notes'
+      - echo "build @build_number@" > $root/release/release.txt
+      - echo "branch @branch@" >> $root/release/release.txt
+      - echo "commit @commit_hash@" >> $root/release/release.txt
+      - ''
       - '# Create release zip'
       - cd $root/release
       - zip $root/release-${branch}.zip *
@@ -54,7 +59,8 @@ jobs:
     condition: ALWAYS
   triggers:
   - !BranchUpdateTrigger
-    branches: master
+    branches: develop
+  - !TagCreateTrigger {}
   retryCondition: never
   maxRetries: 3
   retryDelay: 30
