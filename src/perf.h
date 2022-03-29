@@ -52,4 +52,6 @@ int psvs_perf_get_peak();
 psvs_battery_t *psvs_perf_get_batt();
 psvs_memory_t *psvs_perf_get_memusage();
 
+void psvs_perf_limit_fps(int limit);
+
 #endif

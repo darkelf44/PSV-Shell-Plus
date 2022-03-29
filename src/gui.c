@@ -75,6 +75,7 @@ static const rgba_t WHITE = {.rgba = {.r = 255, .g = 255, .b = 255, .a = 255}};
 static const rgba_t BLACK = {.rgba = {.r = 0, .g = 0, .b = 0, .a = 255}};
 static const rgba_t SELECTED = {.rgba = {.r = 0, .g = 200, .b = 255, .a = 255}};
 static const rgba_t FPS_COLOR = {.rgba = {.r = 0, .g = 255, .b = 0, .a = 255}};
+static const rgba_t FPS_LIMIT_COLOR = {.rgba = {.r = 255, .g = 0, .b = 0, .a = 255}};
 
 
 psvs_gui_mode_t psvs_gui_get_mode() {
@@ -376,6 +377,7 @@ void psvs_gui_set_text_scale(float scale) {
 }
 
 static void _psvs_gui_dd_prchar(const char character, int x, int y) {
+    rgba_t color = (g_session.fps_limit) ? FPS_LIMIT_COLOR : FPS_COLOR;
     for (int yy = 0; yy < g_gui_font_height * g_gui_font_scale; yy++) {
         int yy_font = yy / g_gui_font_scale;
 
@@ -396,7 +398,7 @@ static void _psvs_gui_dd_prchar(const char character, int x, int y) {
             uint8_t charByte = g_gui_font[charPosH + (xx_font / 8)];
 
             if ((charByte >> (7 - (xx_font % 8))) & 1) {
-                *(px + xx) = FPS_COLOR;
+                *(px + xx) = color;
             }
         }
     }
