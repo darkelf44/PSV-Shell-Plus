@@ -68,7 +68,7 @@ static bool g_gui_lazydraw_memusage = false;
 static const int8_t GUI_CORNERS_XD[GUI_CORNERS_XD_RADIUS] = {9, 7, 5, 4, 3, 2, 2, 1, 1};
 
 #define GUI_SELECT_DOT_SIZE 4
-#define GUI_SELECT_DOT_SPACE 10
+#define GUI_SELECT_DOT_SPACE 12
 static const int8_t GUI_SELECT_DOT[GUI_SELECT_DOT_SIZE][2] = {{-1, 1}, {-2, 2}, {-2, 2}, {-1, 1}};
 
 static const rgba_t WHITE = {.rgba = {.r = 255, .g = 255, .b = 255, .a = 255}};
@@ -715,7 +715,7 @@ void psvs_gui_draw_home_template() {
     psvs_gui_set_text_scale(1.0f);
 
     // Page
-    _psvs_gui_draw_select_dots(GUI_ANCHOR_CX(0), GUI_ANCHOR_TY(26, 0), 0, PSVS_GUI_PAGE_COUNT);
+    _psvs_gui_draw_select_dots(GUI_ANCHOR_CX(0), GUI_ANCHOR_TY(28, 0), 0, PSVS_GUI_PAGE_COUNT);
 
     // Batt
     if (!g_is_dolce) {
@@ -931,7 +931,7 @@ void psvs_gui_draw_page_1_template() {
     psvs_gui_set_text_scale(1.0f);
 
     // Page
-    _psvs_gui_draw_select_dots(GUI_ANCHOR_CX(0), GUI_ANCHOR_TY(26, 0), 1, PSVS_GUI_PAGE_COUNT);
+    _psvs_gui_draw_select_dots(GUI_ANCHOR_CX(0), GUI_ANCHOR_TY(28, 0), 1, PSVS_GUI_PAGE_COUNT);
 
     // Controls
     psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(32, 0), "Swap X/O:");
