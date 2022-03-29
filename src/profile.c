@@ -16,6 +16,10 @@
 static bool g_profile_exists = false;
 static bool g_profile_exists_global = false;
 
+psvs_app_session_t g_session = {
+    .fps_limit = 0,
+};
+
 psvs_app_profile_t g_profile = {
     .ver = PSVS_VERSION_VER,
     .mode = {0},
