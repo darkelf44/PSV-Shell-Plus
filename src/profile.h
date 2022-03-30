@@ -3,23 +3,24 @@
 
 typedef struct psvs_app_session_t
 {
-	// FPS Limit
+	// Screen tweaks
+	uint16_t crosshair;
 	uint16_t fps_limit;
 } psvs_app_session_t;
 
 typedef struct psvs_app_profile_t
 {
-    // Version info
-    char ver[8];
-    // OC profile
-    psvs_oc_mode_t mode[PSVS_OC_DEVICE_MAX];
-    int manual_freq[PSVS_OC_DEVICE_MAX];
-    // Control profile
-    bool swap_buttons;
-    bool disable_L3R3;
-    // Bluetooth profile
-    psvs_bt_touch_t bt_touch;
-    psvs_bt_motion_t bt_motion;
+	// Version info
+	char ver[8];
+	// OC profile
+	psvs_oc_mode_t mode[PSVS_OC_DEVICE_MAX];
+	int manual_freq[PSVS_OC_DEVICE_MAX];
+	// Control profile
+	bool swap_buttons;
+	bool disable_L3R3;
+	// Bluetooth profile
+	psvs_bt_touch_t bt_touch;
+	psvs_bt_motion_t bt_motion;
 } psvs_app_profile_t;
 
 extern psvs_app_session_t g_session;
