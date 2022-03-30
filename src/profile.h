@@ -1,6 +1,12 @@
 #ifndef _PROFILE_H_
 #define _PROFILE_H_
 
+typedef struct psvs_app_session_t
+{
+	// FPS Limit
+	uint16_t fps_limit;
+} psvs_app_session_t;
+
 typedef struct psvs_app_profile_t
 {
     // Version info
@@ -16,6 +22,7 @@ typedef struct psvs_app_profile_t
     psvs_bt_motion_t bt_motion;
 } psvs_app_profile_t;
 
+extern psvs_app_session_t g_session;
 extern psvs_app_profile_t g_profile;
 extern bool g_profile_has_changed;
 

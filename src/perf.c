@@ -18,6 +18,7 @@ static int g_perf_usage[4] = {0, 0, 0, 0};
 static SceUInt32 g_perf_tick_last = 0; // AVG CPU load
 static SceUInt32 g_perf_tick_q_last = 0; // Peak CPU load
 static SceUInt32 g_perf_tick_fps_last = 0; // Framerate
+static SceUInt32 g_perf_tick_limit_last = 0; // FPS Limiter
 
 static SceKernelSysClock g_perf_idle_clock_last[4] = {0, 0, 0, 0};
 static SceKernelSysClock g_perf_idle_clock_q_last[4] = {0, 0, 0, 0};
@@ -173,4 +174,18 @@ void psvs_perf_poll_batt() {
     // Grab charger
     bool bval = kscePowerIsBatteryCharging();
     PSVS_CHECK_ASSIGN(g_perf_batt, is_charging, bval);
+}
+
+void psvs_perf_limit_fps(int limit) {
+	// Calculate the minimum frametime
+	uint32_t frametime_limit = SECOND / (limit ? limit : 60);
+	// Calculate the current frametime
+	uint32_t frametime = (SceUInt32) ksceKernelGetProcessTimeLowCore() - g_perf_tick_limit_last;
+
+	if (frametime < frametime_limit) {
+		// Delay thread, if the limit is not reached
+		ksceKernelDelayThread(frametime_limit - frametime);
+	}
+	// Start next frame after the delay
+	g_perf_tick_limit_last = ksceKernelGetProcessTimeLowCore();
 }

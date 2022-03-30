@@ -65,11 +65,18 @@ static bool g_gui_lazydraw_batt = false;
 static bool g_gui_lazydraw_memusage = false;
 
 #define GUI_CORNERS_XD_RADIUS 9
-static const unsigned char GUI_CORNERS_XD[GUI_CORNERS_XD_RADIUS] = {9, 7, 5, 4, 3, 2, 2, 1, 1};
+static const int8_t GUI_CORNERS_XD[GUI_CORNERS_XD_RADIUS] = {9, 7, 5, 4, 3, 2, 2, 1, 1};
+
+#define GUI_SELECT_DOT_SIZE 4
+#define GUI_SELECT_DOT_SPACE 12
+static const int8_t GUI_SELECT_DOT[GUI_SELECT_DOT_SIZE][2] = {{-1, 1}, {-2, 2}, {-2, 2}, {-1, 1}};
 
 static const rgba_t WHITE = {.rgba = {.r = 255, .g = 255, .b = 255, .a = 255}};
 static const rgba_t BLACK = {.rgba = {.r = 0, .g = 0, .b = 0, .a = 255}};
+static const rgba_t SELECTED = {.rgba = {.r = 0, .g = 200, .b = 255, .a = 255}};
 static const rgba_t FPS_COLOR = {.rgba = {.r = 0, .g = 255, .b = 0, .a = 255}};
+static const rgba_t FPS_LIMIT_COLOR = {.rgba = {.r = 255, .g = 0, .b = 0, .a = 255}};
+
 
 psvs_gui_mode_t psvs_gui_get_mode() {
     return g_gui_mode;
@@ -208,6 +215,10 @@ void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
                 g_profile_has_changed = true;
                 break;
 
+            case PSVS_GUI_EXTRA_FPS_LIMIT:
+                g_session.fps_limit = g_session.fps_limit ? (g_session.fps_limit == 30) ? 15 : 0 : 30;
+                break;
+
             case PSVS_GUI_EXTRA_RESTART:
                 kscePowerRequestColdReset();
                 break;
@@ -249,6 +260,12 @@ void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
                     g_profile_has_changed = true;
                 }
                 break;
+
+            case PSVS_GUI_EXTRA_FPS_LIMIT:
+                if (g_session.fps_limit > 0) {
+                    -- g_session.fps_limit;
+                }
+                break;
         }
     }
     else if (buttons_down & SCE_CTRL_RIGHT) {
@@ -278,6 +295,12 @@ void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
                 if (g_profile.bt_motion < PSVS_BT_MOTION_MAX - 1) {
                     ++ g_profile.bt_motion;
                     g_profile_has_changed = true;
+                }
+                break;
+
+            case PSVS_GUI_EXTRA_FPS_LIMIT:
+                if (g_session.fps_limit < 30) {
+                    ++ g_session.fps_limit;
                 }
                 break;
         }
@@ -354,6 +377,7 @@ void psvs_gui_set_text_scale(float scale) {
 }
 
 static void _psvs_gui_dd_prchar(const char character, int x, int y) {
+    rgba_t color = (g_session.fps_limit) ? FPS_LIMIT_COLOR : FPS_COLOR;
     for (int yy = 0; yy < g_gui_font_height * g_gui_font_scale; yy++) {
         int yy_font = yy / g_gui_font_scale;
 
@@ -374,7 +398,7 @@ static void _psvs_gui_dd_prchar(const char character, int x, int y) {
             uint8_t charByte = g_gui_font[charPosH + (xx_font / 8)];
 
             if ((charByte >> (7 - (xx_font % 8))) & 1) {
-                *(px + xx) = FPS_COLOR;
+                *(px + xx) = color;
             }
         }
     }
@@ -518,6 +542,25 @@ rgba_t psvs_gui_scale_color(int value, int min, int max) {
     color.rgba.a = 255;
 
     return color;
+}
+
+static void _psvs_gui_draw_select_dots(int x, int y, int selected, int count)
+{
+    int d = GUI_RESCALE_X(GUI_SELECT_DOT_SPACE);
+    x = GUI_RESCALE_X(x) - ((count - 1) * d) / 2;
+    y = GUI_RESCALE_Y(y) - GUI_SELECT_DOT_SIZE / 2;
+
+    rgba_t *px = (rgba_t *)g_gui_buffer + (y * GUI_WIDTH) + x;
+    int i, xx, yy;
+
+    for (yy = 0; yy < GUI_SELECT_DOT_SIZE; yy++) {
+        for (i = 0; i < count; i++) {
+            rgba_t color = (i == selected) ? SELECTED : WHITE;
+            for (xx = GUI_SELECT_DOT[yy][0]; xx < GUI_SELECT_DOT[yy][1]; xx++)
+                *(px + i * d + xx) = color;
+        }
+        px += GUI_WIDTH;
+    }
 }
 
 static void _psvs_gui_draw_battery_template(int x, int y) {
@@ -688,6 +731,9 @@ void psvs_gui_draw_home_template() {
     psvs_gui_printf(GUI_ANCHOR_CX2(18, 0.5f),     GUI_ANCHOR_TY(8, 0), PSVS_VERSION_STRING);
     psvs_gui_printf(GUI_ANCHOR_RX2(10, 10, 0.5f), GUI_ANCHOR_TY(8, 0), "by Electry");
     psvs_gui_set_text_scale(1.0f);
+
+    // Page
+    _psvs_gui_draw_select_dots(GUI_ANCHOR_CX(0), GUI_ANCHOR_TY(28, 0), 0, PSVS_GUI_PAGE_COUNT);
 
     // Batt
     if (!g_is_dolce) {
@@ -902,6 +948,9 @@ void psvs_gui_draw_page_1_template() {
     psvs_gui_printf(GUI_ANCHOR_RX2(10, 10, 0.5f), GUI_ANCHOR_TY(8, 0), "by Electry");
     psvs_gui_set_text_scale(1.0f);
 
+    // Page
+    _psvs_gui_draw_select_dots(GUI_ANCHOR_CX(0), GUI_ANCHOR_TY(28, 0), 1, PSVS_GUI_PAGE_COUNT);
+
     // Controls
     psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(32, 0), "Swap X/O:");
     psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(32, 1), "Disable L3/R3:");
@@ -909,17 +958,31 @@ void psvs_gui_draw_page_1_template() {
     // Bluetooth
     psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(44, 2), "Bt Touch:");
     psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(44, 3), "Bt Motion:");
+
+    // Utilities
+    psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(56, 4), "FPS Limit:");
 }
 
-static void _psvs_gui_draw_page_1_item(int offset, int line, int id, int size, const char * value) {
+static void _psvs_gui_draw_page_1_item(int offset, int line, int id, int size, const char * format, ...) {
+    // Variables
+    char buffer[256] = "";
+    va_list va;
+
+    // Format string
+    va_start(va, format);
+    vsnprintf(buffer, 256, format, va);
+    va_end(va);
+
     if (g_gui_menu_control == id) {
+        // Draw selected
         psvs_gui_set_text_color(0, 200, 255, 255);
-        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(offset, line), ">");
-        psvs_gui_printf(GUI_ANCHOR_RX(10, size), GUI_ANCHOR_TY(offset, line), value);
+        psvs_gui_print(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(offset, line), ">");
+        psvs_gui_print(GUI_ANCHOR_RX(10, size), GUI_ANCHOR_TY(offset, line), buffer);
         psvs_gui_set_text_color(255, 255, 255, 255);
     } else {
-        psvs_gui_printf(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(offset, line), " ");
-        psvs_gui_printf(GUI_ANCHOR_RX(10, size), GUI_ANCHOR_TY(offset, line), value);
+        // Draw other
+        psvs_gui_print(GUI_ANCHOR_LX(10, 0), GUI_ANCHOR_TY(offset, line), " ");
+        psvs_gui_print(GUI_ANCHOR_RX(10, size), GUI_ANCHOR_TY(offset, line), buffer);
     }
 }
 
@@ -941,20 +1004,24 @@ void psvs_gui_draw_page_1_content() {
     _psvs_gui_draw_page_1_item(44, 2, PSVS_GUI_EXTRA_BT_TOUCH, 5, psvs_gui_bt_touch_title[g_profile.bt_touch]);
     _psvs_gui_draw_page_1_item(44, 3, PSVS_GUI_EXTRA_BT_MOTION, 8, psvs_gui_bt_motion_title[g_profile.bt_motion]);
 
+    // Utilities
+    g_session.fps_limit = (g_session.fps_limit <= 30) ? g_session.fps_limit : 0;
+    _psvs_gui_draw_page_1_item(56, 4, PSVS_GUI_EXTRA_FPS_LIMIT, 3, (g_session.fps_limit == 0) ? "off" : "%3d", g_session.fps_limit);
+
     // System
     if (g_gui_menu_control == PSVS_GUI_EXTRA_RESTART) {
         psvs_gui_set_text_color(0, 200, 255, 255);
-        psvs_gui_printf(GUI_ANCHOR_CX(16), GUI_ANCHOR_BY(10, 2), "> Restart Vita <");
+        psvs_gui_print(GUI_ANCHOR_CX(16), GUI_ANCHOR_BY(10, 2), "> Restart Vita <");
         psvs_gui_set_text_color(255, 255, 255, 255);
     } else {
         psvs_gui_printf(GUI_ANCHOR_CX(16), GUI_ANCHOR_BY(10, 2), "  Restart Vita  ");
     }
     if (g_gui_menu_control == PSVS_GUI_EXTRA_SHUTDOWN) {
         psvs_gui_set_text_color(0, 200, 255, 255);
-        psvs_gui_printf(GUI_ANCHOR_CX(17), GUI_ANCHOR_BY(10, 1), "> Shutdown Vita <");
+        psvs_gui_print(GUI_ANCHOR_CX(17), GUI_ANCHOR_BY(10, 1), "> Shutdown Vita <");
         psvs_gui_set_text_color(255, 255, 255, 255);
     } else {
-        psvs_gui_printf(GUI_ANCHOR_CX(17), GUI_ANCHOR_BY(10, 1), "  Shutdown Vita  ");
+        psvs_gui_print(GUI_ANCHOR_CX(17), GUI_ANCHOR_BY(10, 1), "  Shutdown Vita  ");
     }
 }
 
