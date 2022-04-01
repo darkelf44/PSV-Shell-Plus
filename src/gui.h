@@ -83,6 +83,19 @@ typedef struct psvs_gui_page_t {
 
 extern const psvs_gui_page_t * g_gui_page;
 
+typedef enum psvs_gui_crosshair_t {
+	PSVS_GUI_CROSSHAIR_NONE,
+	PSVS_GUI_CROSSHAIR_BASIC,
+	PSVS_GUI_CROSSHAIR_CROSS,
+	PSVS_GUI_CROSSHAIR_DOT,
+	PSVS_GUI_CROSSHAIR_TRI,
+	PSVS_GUI_CROSSHAIR_BASIC_ALT,
+	PSVS_GUI_CROSSHAIR_CROSS_ALT,
+	PSVS_GUI_CROSSHAIR_DOT_ALT,
+	PSVS_GUI_CROSSHAIR_TRI_ALT,
+	PSVS_GUI_CROSSHAIR_MAX,
+} psvs_gui_crosshair_t;
+
 psvs_gui_mode_t psvs_gui_get_mode();
 
 void psvs_gui_init_home();
@@ -103,6 +116,7 @@ void psvs_gui_set_text_scale(float scale);
 
 void psvs_gui_dd_fps();
 void psvs_gui_dd_dot(int cx, int cy, int r, rgba_t color);
+void psvs_gui_dd_crosshair(psvs_gui_crosshair_t style);
 
 void psvs_gui_clear();
 void psvs_gui_print(int x, int y, const char *str);

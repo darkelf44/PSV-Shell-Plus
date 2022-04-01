@@ -73,10 +73,11 @@ static const int8_t GUI_SELECT_DOT[GUI_SELECT_DOT_SIZE][2] = {{-1, 1}, {-2, 2}, 
 
 static const rgba_t WHITE = {.rgba = {.r = 255, .g = 255, .b = 255, .a = 255}};
 static const rgba_t BLACK = {.rgba = {.r = 0, .g = 0, .b = 0, .a = 255}};
+static const rgba_t RED = {.rgba = {.r = 255, .g = 0, .b = 0, .a = 255}};
+static const rgba_t GREEN = {.rgba = {.r = 0, .g = 255, .b = 0, .a = 255}};
 static const rgba_t SELECTED = {.rgba = {.r = 0, .g = 200, .b = 255, .a = 255}};
-static const rgba_t FPS_COLOR = {.rgba = {.r = 0, .g = 255, .b = 0, .a = 255}};
-static const rgba_t FPS_LIMIT_COLOR = {.rgba = {.r = 255, .g = 0, .b = 0, .a = 255}};
-
+#define FPS_COLOR GREEN
+#define FPS_LIMIT_COLOR RED
 
 psvs_gui_mode_t psvs_gui_get_mode() {
 	return g_gui_mode;
@@ -214,7 +215,7 @@ void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
 				g_profile.bt_motion = (g_profile.bt_motion + 1) % PSVS_BT_MOTION_MAX;
 				g_profile_has_changed = true;
 				break;
-
+				
 			case PSVS_GUI_EXTRA_FPS_LIMIT:
 				g_session.fps_limit = g_session.fps_limit ? (g_session.fps_limit == 30) ? 15 : 0 : 30;
 				break;
@@ -261,6 +262,12 @@ void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
 				}
 				break;
 
+			case PSVS_GUI_EXTRA_CROSSHAIR:
+				if (g_session.crosshair > 0) {
+					-- g_session.crosshair;
+				}
+				break;
+
 			case PSVS_GUI_EXTRA_FPS_LIMIT:
 				if (g_session.fps_limit > 0) {
 					-- g_session.fps_limit;
@@ -295,6 +302,12 @@ void psvs_gui_input_page_1(uint32_t buttons_held, uint32_t buttons_down) {
 				if (g_profile.bt_motion < PSVS_BT_MOTION_MAX - 1) {
 					++ g_profile.bt_motion;
 					g_profile_has_changed = true;
+				}
+				break;
+
+			case PSVS_GUI_EXTRA_CROSSHAIR:
+				if (g_session.crosshair < PSVS_GUI_CROSSHAIR_MAX - 1) {
+					++ g_session.crosshair;
 				}
 				break;
 
@@ -439,6 +452,53 @@ void psvs_gui_dd_dot(int cx, int cy, int r, rgba_t color) {
 
 	DACR_RESET(dacr);
 }
+
+void psvs_gui_dd_crosshair(psvs_gui_crosshair_t style) {
+	rgba_t color = {.uint32 = 0};
+
+	uint32_t dacr;
+	DACR_UNRESTRICT(dacr);
+
+	switch (style) {
+		case PSVS_GUI_CROSSHAIR_BASIC:
+			color = WHITE;
+		case PSVS_GUI_CROSSHAIR_BASIC_ALT:
+			if (!color.uint32) color = GREEN;
+			{
+			}
+			break;
+			
+		case PSVS_GUI_CROSSHAIR_CROSS:
+			color = WHITE;
+		case PSVS_GUI_CROSSHAIR_CROSS_ALT:
+			if (!color.uint32) color = GREEN;
+			{
+			}
+			break;
+
+		case PSVS_GUI_CROSSHAIR_DOT:
+			color = WHITE;
+		case PSVS_GUI_CROSSHAIR_DOT_ALT:
+			if (!color.uint32) color = GREEN;
+			{
+			}
+			break;
+
+		case PSVS_GUI_CROSSHAIR_TRI:
+			color = WHITE;
+		case PSVS_GUI_CROSSHAIR_TRI_ALT:
+			if (!color.uint32) color = GREEN;
+			{
+			}
+			break;
+			
+		default:
+			break;
+	}
+
+	DACR_RESET(dacr);
+}
+
 
 void psvs_gui_clear() {
 	for (int i = 0; i < GUI_WIDTH * GUI_HEIGHT; i++)
@@ -960,7 +1020,8 @@ void psvs_gui_draw_page_1_template() {
 	psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(44, 3), "Bt Motion:");
 
 	// Utilities
-	psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(56, 4), "FPS Limit:");
+	psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(56, 4), "Crosshair:");
+	psvs_gui_printf(GUI_ANCHOR_LX(10, 2),  GUI_ANCHOR_TY(56, 5), "FPS Limit:");
 }
 
 static void _psvs_gui_draw_page_1_item(int offset, int line, int id, int size, const char * format, ...) {
@@ -1005,8 +1066,10 @@ void psvs_gui_draw_page_1_content() {
 	_psvs_gui_draw_page_1_item(44, 3, PSVS_GUI_EXTRA_BT_MOTION, 8, psvs_gui_bt_motion_title[g_profile.bt_motion]);
 
 	// Utilities
+	g_session.crosshair = (g_session.crosshair < PSVS_GUI_CROSSHAIR_MAX) ? g_session.crosshair : 0;
 	g_session.fps_limit = (g_session.fps_limit <= 30) ? g_session.fps_limit : 0;
-	_psvs_gui_draw_page_1_item(56, 4, PSVS_GUI_EXTRA_FPS_LIMIT, 3, (g_session.fps_limit == 0) ? "off" : "%3d", g_session.fps_limit);
+	_psvs_gui_draw_page_1_item(56, 4, PSVS_GUI_EXTRA_FPS_LIMIT, 3, (g_session.crosshair == 0) ? "off" : "%3d", g_session.crosshair);
+	_psvs_gui_draw_page_1_item(56, 5, PSVS_GUI_EXTRA_FPS_LIMIT, 3, (g_session.fps_limit == 0) ? "off" : "%3d", g_session.fps_limit);
 
 	// System
 	if (g_gui_menu_control == PSVS_GUI_EXTRA_RESTART) {

@@ -4,7 +4,7 @@
 typedef struct psvs_app_session_t
 {
 	// Screen tweaks
-	uint16_t crosshair;
+	psvs_gui_crosshair_t crosshair;
 	uint16_t fps_limit;
 } psvs_app_session_t;
 

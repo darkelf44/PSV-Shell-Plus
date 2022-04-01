@@ -142,8 +142,11 @@ int ksceDisplaySetFrameBufInternal_patched(int head, int index, const SceDisplay
 
     ksceKernelUnlockMutex(g_mutex_framebuf_uid, 1);
 
-    if (mode == PSVS_GUI_MODE_FPS && g_session.fps_limit) {
-        psvs_perf_limit_fps(g_session.fps_limit); // limit framerate
+    if (mode == PSVS_GUI_MODE_FPS) {
+        if (g_session.crosshair)
+            psvs_gui_dd_crosshair(g_session.crosshair);
+        if (g_session.fps_limit)
+            psvs_perf_limit_fps(g_session.fps_limit); // limit framerate
     }
 
 DISPLAY_HOOK_RET:
