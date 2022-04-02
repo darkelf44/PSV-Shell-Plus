@@ -1,8 +1,4 @@
-#include <vitasdkkern.h>
-#include <taihen.h>
-#include <stdbool.h>
-
-#include "main.h"
+#include "headers.h"
 
 SceUInt32 ksceKernelGetProcessTimeLowCore();
 SceUInt32 ksceKernelSysrootGetCurrentAddressSpaceCB();

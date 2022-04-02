@@ -1,21 +1,8 @@
-#include <vitasdkkern.h>
-#include <psp2/touch.h>
-#include <psp2/motion.h>
-#include <taihen.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdio.h>
+#include "headers.h"
 
-#include "main.h"
-#include "gui.h"
 #include "gui_font_ter-u14b.h"
 #include "gui_font_ter-u18b.h"
 #include "gui_font_ter-u24b.h"
-#include "perf.h"
-#include "oc.h"
-#include "bt.h"
-#include "profile.h"
 
 int vsnprintf(char *s, size_t n, const char *format, va_list arg);
 

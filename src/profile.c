@@ -1,15 +1,4 @@
-#include <vitasdkkern.h>
-#include <psp2/touch.h>
-#include <psp2/motion.h>
-#include <taihen.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "main.h"
-#include "oc.h"
-#include "bt.h"
-#include "profile.h"
+#include "headers.h"
 
 #define PSVS_PROFILES_DIR "ur0:data/PSVshell/profiles/"
 

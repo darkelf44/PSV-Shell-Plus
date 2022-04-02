@@ -1,14 +1,4 @@
-#include <vitasdkkern.h>
-#include <psp2/touch.h>
-#include <psp2/motion.h>
-#include <taihen.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <string.h>
-
-#include "oc.h"
-#include "bt.h"
-#include "profile.h"
+#include "headers.h"
 
 struct psvs_ds3_input_report_t {
     unsigned char report_id;

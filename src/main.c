@@ -1,17 +1,4 @@
-#include <vitasdkkern.h>
-#include <psp2/touch.h>
-#include <psp2/motion.h>
-#include <taihen.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "main.h"
-#include "oc.h"
-#include "bt.h"
-#include "gui.h"
-#include "perf.h"
-#include "profile.h"
+#include "headers.h"
 
 int module_get_offset(SceUID pid, SceUID modid, int segidx, size_t offset, uintptr_t *addr);
 int module_get_export_func(SceUID pid, const char *modname, uint32_t libnid, uint32_t funcnid, uintptr_t *func);
