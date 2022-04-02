@@ -441,7 +441,9 @@ void psvs_gui_dd_dot(int cx, int cy, int r, rgba_t color) {
 }
 
 void psvs_gui_dd_crosshair(psvs_gui_crosshair_t style) {
+	int x, y;
 	rgba_t color = {.uint32 = 0};
+	rgba_t * screen = (rgba_t *) g_gui_fb.base + (g_gui_fb.width / 2) + g_gui_fb.pitch * (g_gui_fb.height / 2);
 
 	uint32_t dacr;
 	DACR_UNRESTRICT(dacr);
@@ -451,7 +453,22 @@ void psvs_gui_dd_crosshair(psvs_gui_crosshair_t style) {
 			color = WHITE;
 		case PSVS_GUI_CROSSHAIR_BASIC_ALT:
 			if (!color.uint32) color = GREEN;
-			{
+
+			for (y = -12; y < -3; ++ y) {
+				*(screen + y * g_gui_fb.pitch - 1) = color;
+				*(screen + y * g_gui_fb.pitch) = color;
+			}
+			for (x = -12; x < -3; ++ x) {
+				*(screen + x - g_gui_fb.pitch) = color;
+				*(screen + x) = color;
+			}
+			for (x = 3; x < 12; ++ x) {
+				*(screen + x - g_gui_fb.pitch) = color;
+				*(screen + x) = color;
+			}
+			for (y = 3; y < 12; ++ y) {
+				*(screen + y * g_gui_fb.pitch - 1) = color;
+				*(screen + y * g_gui_fb.pitch) = color;
 			}
 			break;
 			
@@ -1055,7 +1072,7 @@ void psvs_gui_draw_page_1_content() {
 	// Utilities
 	g_session.crosshair = (g_session.crosshair < PSVS_GUI_CROSSHAIR_MAX) ? g_session.crosshair : 0;
 	g_session.fps_limit = (g_session.fps_limit <= 30) ? g_session.fps_limit : 0;
-	_psvs_gui_draw_page_1_item(56, 4, PSVS_GUI_EXTRA_FPS_LIMIT, 3, (g_session.crosshair == 0) ? "off" : "%3d", g_session.crosshair);
+	_psvs_gui_draw_page_1_item(56, 4, PSVS_GUI_EXTRA_CROSSHAIR, 3, (g_session.crosshair == 0) ? "off" : "%3d", g_session.crosshair);
 	_psvs_gui_draw_page_1_item(56, 5, PSVS_GUI_EXTRA_FPS_LIMIT, 3, (g_session.fps_limit == 0) ? "off" : "%3d", g_session.fps_limit);
 
 	// System
