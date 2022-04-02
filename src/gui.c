@@ -476,26 +476,21 @@ void psvs_gui_dd_crosshair(psvs_gui_crosshair_t style) {
 			color = WHITE;
 		case PSVS_GUI_CROSSHAIR_CROSS_ALT:
 			if (!color.uint32) color = GREEN;
-			{
+
+			for (y = -10; y < -3; ++ y) {
+				for (x = 0; x < 4; ++ x) {
+					*(screen + y * (g_gui_fb.pitch - 2) - x) = color;
+					*(screen + y * (g_gui_fb.pitch + 2) + x) = color;
+				}
+			}
+			for (y = 3; y < 10; ++ y) {
+				for (x = 0; x < 4; ++ x) {
+					*(screen + y * (g_gui_fb.pitch - 2) - x) = color;
+					*(screen + y * (g_gui_fb.pitch + 2) + x) = color;
+				}
 			}
 			break;
 
-		case PSVS_GUI_CROSSHAIR_DOT:
-			color = WHITE;
-		case PSVS_GUI_CROSSHAIR_DOT_ALT:
-			if (!color.uint32) color = GREEN;
-			{
-			}
-			break;
-
-		case PSVS_GUI_CROSSHAIR_TRI:
-			color = WHITE;
-		case PSVS_GUI_CROSSHAIR_TRI_ALT:
-			if (!color.uint32) color = GREEN;
-			{
-			}
-			break;
-			
 		default:
 			break;
 	}
@@ -1081,7 +1076,7 @@ void psvs_gui_draw_page_1_content() {
 		psvs_gui_print(GUI_ANCHOR_CX(16), GUI_ANCHOR_BY(10, 2), "> Restart Vita <");
 		psvs_gui_set_text_color(255, 255, 255, 255);
 	} else {
-		psvs_gui_printf(GUI_ANCHOR_CX(16), GUI_ANCHOR_BY(10, 2), "  Restart Vita  ");
+		psvs_gui_print(GUI_ANCHOR_CX(16), GUI_ANCHOR_BY(10, 2), "  Restart Vita  ");
 	}
 	if (g_gui_menu_control == PSVS_GUI_EXTRA_SHUTDOWN) {
 		psvs_gui_set_text_color(0, 200, 255, 255);
